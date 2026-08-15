@@ -52,6 +52,15 @@
     .croc-row{ background:rgba(239,68,68,.18) !important; }
   }
   @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+  /* iOS 加到主畫面後的安全區域：避免標題被時間／電池蓋住，底部避開 Home 指示條 */
+  @supports (padding: env(safe-area-inset-top)){
+    header{ padding-top: env(safe-area-inset-top); }
+    body{ padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+    main{ padding-bottom: calc(1.25rem + env(safe-area-inset-bottom)); }
+    #floatClose{ bottom: calc(14px + env(safe-area-inset-bottom)) !important; }
+    .toast-sa{ bottom: calc(1.25rem + env(safe-area-inset-bottom)) !important; }
+  }
+
   /* 新增標的表單：標籤／輸入框／提示三層固定高度，桌機版才不會因為只有部分欄位有提示而錯位 */
   .af      { display:flex; flex-direction:column; min-width:0; }
   .af-lab  { display:block; height:15px; line-height:15px; margin-bottom:4px;
@@ -2920,7 +2929,7 @@ function toast(msg, kind='info'){
   try{ const lr = $(kind==='err' ? 'liveAlert' : 'liveRegion'); if(lr) lr.textContent = msg; }catch(e){}
   const c = { ok:'bg-emerald-600', warn:'bg-amber-600', err:'bg-rose-600', info:'bg-slate-700' }[kind] || 'bg-slate-700';
   const el = document.createElement('div');
-  el.className = `fixed bottom-5 right-5 z-[60] ${c} text-white text-xs px-4 py-2.5 rounded-xl shadow-2xl fade-in max-w-sm`;
+  el.className = `toast-sa fixed bottom-5 right-5 z-[60] ${c} text-white text-xs px-4 py-2.5 rounded-xl shadow-2xl fade-in max-w-sm`;
   el.textContent = msg;
   document.body.appendChild(el);
   setTimeout(()=>{ el.style.transition='opacity .4s'; el.style.opacity='0'; setTimeout(()=>el.remove(),400); }, 4200);
