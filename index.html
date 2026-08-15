@@ -183,9 +183,9 @@
     h1,h2,h3,p,td,th,label,span,code{ overflow-wrap:anywhere; }
     code{ word-break:break-all; }
   }
-  /* 手機：任何彈窗開啟時，右下角固定一顆關閉鈕 */
+  /* 浮動關閉鈕：預設一律隱藏（含桌機），只有手機開啟彈窗時才出現 */
+  #floatClose{ display:none; }
   @media (max-width: 820px){
-    #floatClose{ display:none; }
     body.modal-open #floatClose{
       display:flex; position:fixed; right:14px; bottom:14px; z-index:200;
       width:52px; height:52px; border-radius:999px; align-items:center; justify-content:center;
@@ -216,7 +216,7 @@
           <p class="text-[11px] text-slate-400 leading-tight">長期投資 · 資產配置 · 心理管理 — 11 大動物法則</p>
         </div>
       </div>
-      <div id="proxyBadge" class="hidden px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/40 whitespace-nowrap cursor-pointer" title="點此清除代理">⚠ 使用代理中</div>
+      <button type="button" id="proxyBadge" class="hidden px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/40 whitespace-nowrap cursor-pointer" title="點此清除代理">⚠ 使用代理中</button>
       <div id="connBadge" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 whitespace-nowrap">🟡 模擬數據模式</div>
       <button id="logoutBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-700/70 hover:bg-rose-600 text-white transition whitespace-nowrap" title="清除這台裝置上的 Token 與持倉，交還裝置前請務必執行">🚪 登出／清除</button>
       <button id="diagBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700/70 hover:bg-slate-600 text-slate-200 transition whitespace-nowrap" title="檢查連線狀態、實際請求網址與資料欄位偵測">🔍 連線診斷</button>
@@ -225,11 +225,11 @@
     </div>
 
     <!-- 第二排：Token（已連線後自動收合成一行） -->
-    <div id="tokenSummary" class="hidden items-center gap-2 bg-slate-950/60 border border-slate-700/50 rounded-xl px-3 py-2 cursor-pointer hover:border-slate-600 transition">
+    <button type="button" id="tokenSummary" aria-expanded="false" aria-controls="tokenPanel" class="hidden items-center gap-2 w-full text-left bg-slate-950/60 border border-slate-700/50 rounded-xl px-3 py-2 cursor-pointer hover:border-slate-600 transition">
       <span class="text-sm">🔑</span>
       <span id="tokenSummaryText" class="text-[11px] text-slate-300 flex-1">Token 已設定</span>
       <span class="text-[11px] text-slate-400">點此展開修改 ▾</span>
-    </div>
+    </button>
 
     <div id="tokenPanel" class="bg-slate-950/60 border border-slate-700/50 rounded-xl p-3">
       <div class="flex items-center justify-between mb-1.5">
@@ -491,7 +491,7 @@
           <span class="w-1.5 h-4 bg-indigo-400 rounded"></span>區塊 E · 三維度精準目標價與動態調倉
           <span class="text-[10px] font-normal text-slate-400">長線持股 · 短線價差 · 動態放大持股</span>
         </h2>
-        <p class="text-[11px] text-slate-400 mt-0.5">長期＝EPS×12/16/22 倍本益比估值；中期＝60MA 季線防線；短期＝20MA ± 2σ 布林通道。</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">長期＝EPS×12/16/20 倍本益比估值；中期＝60MA 季線防線；短期＝20MA ± 2σ 布林通道。</p>
       </div>
       <select id="targetSelect" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500"></select>
     </div>
@@ -1160,7 +1160,7 @@ function stockAnimals(s){
 const FIN_IND  = /金融|保險|銀行|證券|租賃/;
 /* 租賃／分期付款業在 TWSE 的產業分類是「其他業」，靠產業名稱永遠比對不到，
    必須用代號白名單：中租-KY、裕融、和潤、裕日車融資體系等 */
-const LEASING_IDS = new Set(['5871','9941','6592','2income','2841','5876']);
+const LEASING_IDS = new Set(['5871','9941','6592','2841','5876']);
 const HIGH_IND = /電腦及週邊|其他電子|航運|航空|建材|營造|貿易百貨|觀光|汽車|油電燃氣/;
 function isFinancial(ind, id){ return FIN_IND.test(String(ind||'')) || (id && LEASING_IDS.has(String(id))); }
 function isHighDebtIndustry(ind){ return HIGH_IND.test(String(ind||'')); }
@@ -2742,7 +2742,7 @@ const GUIDE = [
    ['🔴 瘋狂昂貴價（小豬過載 🐖）','EPS × <strong>20</strong> 倍','過熱區。與燈號、策略卡的「昂貴」門檻（本益比 20 倍）完全一致——股價超過這個數字時，燈號同步轉紅。']
   ]) +
   NOTE('amber','⚠️ 本益比估值法的兩個盲點（很重要）',
-   '<strong>①高成長股會長期顯示「昂貴」</strong>：成長性強的公司（例如部分半導體、AI 供應鏈）市場願意給 30 倍以上，用 22 倍當上限會讓你長期抱不住。<br><strong>②景氣循環股在獲利高峰反而顯示「便宜」</strong>：航運、面板、記憶體在景氣頂點 EPS 暴衝，本益比看起來只有 5 倍，但那正是最危險的位置（低本益比陷阱）。<br>使用時請自己分類：成熟穩定股適用，成長股與循環股要另外判斷。') +
+   '<strong>①高成長股會長期顯示「昂貴」</strong>：成長性強的公司（例如部分半導體、AI 供應鏈）市場願意給 30 倍以上，用 20 倍當上限會讓你長期抱不住。<br><strong>②景氣循環股在獲利高峰反而顯示「便宜」</strong>：航運、面板、記憶體在景氣頂點 EPS 暴衝，本益比看起來只有 5 倍，但那正是最危險的位置（低本益比陷阱）。<br>使用時請自己分類：成熟穩定股適用，成長股與循環股要另外判斷。') +
   H2('📊 中期目標價 — 波段趨勢還在嗎？') +
   TABLE(['目標價','公式','意義'],[
    ['🟢 強勢加碼價（鯨魚護航 🐋）','最新 <strong>60MA 季線</strong>','股價回檔至季線＋大戶持續加碼＝中線最精準的波段買點形態。'],
@@ -3296,25 +3296,44 @@ document.addEventListener('click', e=>{
     return;
   }
   if(t.id==='proxySave'){
-    state.proxy = $('proxyInput').value.replace(/\s+/g,'');
-    $('proxyInput').value = state.proxy;
-    persist(); updateProxyBadge();
-    if(/\/dev(\?|$)/.test(state.proxy)){
-      showModal({ icon:'⚠️', title:'這是「測試部署」網址（/dev），不能用',
-        body:`你填入的網址結尾是 <code class="bg-slate-800 px-1 rounded">/dev</code>：<br>
-              <code class="bg-slate-800 px-1 rounded text-[10px] break-all">${esc(state.proxy)}</code><br><br>
-              <strong class="text-amber-300">/dev 是 Apps Script 的測試網址，永遠要求登入</strong>，只有專案編輯者本人在瀏覽器裡開得起來。
-              程式用匿名身分呼叫時一定會失敗（Failed to fetch 或 404）。<br><br>
-              請改用<strong>正式部署網址</strong>（結尾是 <code class="bg-slate-800 px-1 rounded">/exec</code>）：<br>
-              Apps Script → 右上「部署」→「管理部署作業」→ 複製「網頁應用程式」欄位的網址。<br><br>
-              同時確認該部署的「<strong>誰可以存取</strong>」設定為「<strong>任何人</strong>」。`,
+    /* 資安修正：一律先驗證，通過並經使用者確認後才寫入 state.proxy。
+       舊版是先賦值再檢查，警告跳出來時代理其實已經生效並存檔。 */
+    const val = $('proxyInput').value.replace(/\s+/g,'');
+    $('proxyInput').value = val;
+
+    if(!val){
+      state.proxy = ''; state.pendingProxy = null;
+      persist(); updateProxyBadge();
+      toast('已清除代理設定。','info');
+      return;
+    }
+
+    const bad = proxyProblem(val);
+    if(bad){
+      const isDev = /\/dev(\?|$)/.test(val);
+      showModal({ icon:'⚠️', title: isDev ? '這是「測試部署」網址（/dev），不能用' : '這個代理網址不能用',
+        body:`<code class="bg-slate-800 px-1 rounded text-[10px] break-all">${esc(val)}</code><br><br>
+              <strong class="text-amber-300">問題：</strong>${esc(bad)}<br><br>` +
+             (isDev
+               ? `/dev 是 Apps Script 的測試網址，永遠要求登入，只有專案編輯者本人在瀏覽器裡開得起來。
+                  程式用匿名身分呼叫時一定會失敗（Failed to fetch 或 404）。<br><br>
+                  請改用<strong>正式部署網址</strong>（結尾是 <code class="bg-slate-800 px-1 rounded">/exec</code>）：
+                  Apps Script → 右上「部署」→「管理部署作業」→ 複製「網頁應用程式」欄位的網址，
+                  並確認「<strong>誰可以存取</strong>」設為「<strong>任何人</strong>」。<br><br>`
+               : '') +
+             `<span class="text-emerald-300">這組設定<strong>沒有</strong>被套用</span>，${state.proxy ? '目前仍維持原本的代理設定。' : '目前沒有使用任何代理。'}`,
         actions:`<button data-conf="close" class="flex-1 py-2 rounded-lg text-xs font-semibold bg-slate-700 hover:bg-slate-600">我知道了</button>` });
       return;
     }
-    if(state.proxy && !state.proxy.includes('{url}')){
-      toast('提醒：代理網址少了 {url} 佔位符，儀表板會直接把網址接在後面，多數代理會失敗。','warn');
-    }
-    toast(state.proxy ? ('已套用代理：' + state.proxy) : '已清除代理設定。', state.proxy?'ok':'info');
+
+    /* 通過格式檢查，但仍需二次確認 —— Token 會明文經過這台伺服器 */
+    state.pendingProxy = val;
+    showModal({ icon:'🔐', title:'確認要使用這個 API 代理嗎？',
+      body:'<strong class="text-rose-300">啟用後，你的 FinMind Token 會以明文送到這台伺服器，對方可以完整取得它。</strong><br><br>'
+         + '<code class="bg-slate-800 px-1 rounded text-[10px] break-all">' + esc(val) + '</code><br><br>'
+         + '請只使用你自己架設、或你明確信任的服務。若這串網址是別人給你的，請選「不要使用」。',
+      actions:'<button data-conf="proxyNo" class="flex-1 py-2 rounded-lg text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-900">不要使用（安全）</button>'
+            + '<button data-conf="proxyYes" class="flex-1 py-2 rounded-lg text-xs bg-slate-700 hover:bg-slate-600">我信任它，啟用</button>' });
     return;
   }
   if(t.id==='proxyClear'){ state.proxy=''; $('proxyInput').value=''; persist(); updateProxyBadge(); toast('已清除代理設定。','info'); return; }
@@ -3484,6 +3503,7 @@ function answerRemember(yes){
 function setTokenCollapsed(on){
   const panel = $('tokenPanel'), sum = $('tokenSummary');
   if(!panel || !sum) return;
+  sum.setAttribute('aria-expanded', on ? 'false' : 'true');
   if(on){
     panel.classList.add('hidden');
     sum.classList.remove('hidden'); sum.classList.add('flex');
