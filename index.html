@@ -229,7 +229,7 @@
     <button type="button" id="tokenSummary" aria-expanded="false" aria-controls="tokenPanel" class="hidden items-center gap-2 w-full text-left bg-slate-950/60 border border-slate-700/50 rounded-xl px-3 py-2 cursor-pointer hover:border-slate-600 transition">
       <span class="text-sm">🔑</span>
       <span id="tokenSummaryText" class="text-[11px] text-slate-300 flex-1">Token 已設定</span>
-      <span class="text-[11px] text-slate-400">點此展開修改 ▾</span>
+      <span class="text-[11px] text-slate-400">點此展開修改／說明 ▾</span>
     </button>
 
     <div id="tokenPanel" class="bg-slate-950/60 border border-slate-700/50 rounded-xl p-3">
@@ -262,6 +262,8 @@
       </div>
     </div>
     <div id="noStoreWarn" class="hidden mt-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-[11px] text-amber-200 leading-relaxed"></div>
+    <div id="envWarn" class="hidden mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-200 text-[11px] leading-relaxed p-2.5"></div>
+    <div id="tokenExtras">
     <div id="tokenHelp" class="mt-2 rounded-lg border border-slate-700/50 bg-slate-950/50 p-2.5 text-[12px] text-slate-300 leading-relaxed">
       <strong class="text-slate-200">FinMind 是什麼？</strong>一個免費的台股開放資料服務。<strong class="text-amber-300">沒有它，本頁顯示的全部是示範數字，不是真實股價。</strong>
       <ol class="mt-1.5 space-y-0.5 list-decimal pl-5 text-slate-300">
@@ -271,7 +273,6 @@
       </ol>
     </div>
     <p id="tokenHint" class="text-[11px] text-amber-300/90 mt-2">請輸入 FinMind Token 以啟用真實數據連線（預設將以模擬數據展示功能）。</p>
-    <div id="envWarn" class="hidden mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-200 text-[11px] leading-relaxed p-2.5"></div>
     <div class="mt-2">
       <button id="advToggle" class="text-[11px] text-slate-400 hover:text-slate-200 underline decoration-dotted">▸ 進階設定：API 代理網址（連線被瀏覽器擋掉時才需要）</button>
       <div id="advPanel" class="hidden mt-2 bg-slate-950/60 border border-slate-700/50 rounded-lg p-2.5">
@@ -284,6 +285,7 @@
         <p class="text-[10px] text-slate-400 mt-1.5 leading-relaxed">說明：若你把本頁下載到電腦、用瀏覽器直接開啟仍然連不上，代表 FinMind 沒有回傳跨來源標頭，這時才需要透過代理轉送。<strong class="text-amber-300/80">你的 Token 會經過該代理伺服器</strong>，請只使用你自己架設或明確信任的服務。</p>
       </div>
     </div>
+    </div><!-- /tokenExtras -->
   </div>
 </header>
 
@@ -855,6 +857,37 @@ function updateSessionBadge(){
   b.title = `台北時間 ${m.time} — ${m.detail}（點我看說明）`;
 }
 let rtForce = false;
+let rtUnavailable = false;      // 這個帳號的方案不支援即時報價端點（本次開啟有效）
+function updateRtButton(){
+  const b = $('rtBtn'); if(!b) return;
+  b.textContent = rtUnavailable ? '⚡ 即時報價（需 sponsor）' : '⚡ 更新即時報價';
+  b.title = rtUnavailable
+    ? 'FinMind 的即時報價端點只開放 sponsor 會員。點我看說明。'
+    : '把自選清單的價格換成最後一筆成交（均線與布林仍為前一交易日）';
+}
+function showSponsorModal(e){
+  showModal({ icon:'🔒', title:'即時報價需要 FinMind sponsor 會員',
+    body:`先講結論：<strong class="text-emerald-300">你的 Token 沒問題，連線也沒問題。</strong>剛剛「重新整理本頁」拿到的收盤價就是證據。<br><br>
+      FinMind 官方文件把即時報價端點標示為
+      <code class="bg-slate-800 px-1 rounded text-[10px] break-all">taiwan_stock_tick_snapshot</code>
+      <strong class="text-amber-300">「只限 sponsor 會員使用」</strong>。免費帳號呼叫它會被拒絕。<br><br>
+      <div class="rounded-lg bg-slate-800/60 border border-slate-700 p-2.5 text-[11px] leading-relaxed">
+        <div class="text-slate-400 mb-1">為什麼錯誤訊息看起來像「被攔截」</div>
+        FinMind 回的是錯誤狀態，但那個錯誤回應<strong>沒有附上跨來源（CORS）標頭</strong>，
+        瀏覽器就把整個回應丟掉，只留下一句 <code class="bg-slate-900 px-1 rounded">Failed to fetch</code> 給程式。
+        從 JavaScript 的角度，「被防火牆擋住」和「對方拒絕但沒帶標頭」長得一模一樣——舊版因此誤判成連線問題。
+      </div><br>
+      <div class="rounded-lg bg-emerald-500/10 border border-emerald-500/40 text-emerald-200 p-2.5 text-[11px] leading-relaxed">
+        <div class="font-bold mb-1">實際影響：幾乎沒有</div>
+        本頁所有位階、目標價與策略判定<strong>本來就是用收盤價計算</strong>的。
+        「🔄 重新整理本頁」與「⚡ 抓取全部自選」用的是免費的
+        <code class="bg-slate-900 px-1 rounded text-[10px]">/data</code> 端點，那才是這個儀表板真正需要的資料。
+        即時報價只是把價格換成最後一筆成交，均線與布林通道仍然是前一交易日——參考價值本來就有限。
+      </div>
+      ${e && e.detail ? `<div class="text-[10px] text-slate-500 mt-2">${esc(e.detail)}</div>` : ''}`,
+    actions:`<button data-conf="close" class="flex-1 py-2 rounded-lg text-xs font-semibold bg-slate-700 hover:bg-slate-600">了解</button>`
+          + `<button data-conf="rtRetry" class="flex-1 py-2 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-400">仍要再試一次</button>` });
+}
 function showSessionModal(fromRt){
   const m = marketSession();
   const head = `<div class="rounded-lg bg-slate-800/60 border border-slate-700 p-2.5 mb-2">
@@ -973,17 +1006,29 @@ function buildUrl(dataset, params={}, withToken=true){
 class ApiError extends Error {
   constructor(msg, kind, detail){ super(msg); this.kind = kind; this.detail = detail || ''; }
 }
-function classifyFetchError(e){
+function classifyFetchError(e, ctx){
   // fetch 只有在「請求根本沒送出去 / 回應被瀏覽器擋掉」時才會拋 TypeError
   const blocked = (e instanceof TypeError) || /failed to fetch|load failed|networkerror/i.test(e.message||'');
-  if(blocked){
+  if(!blocked) return e;
+  /* 關鍵推論：如果這個瀏覽器、這個 Token 剛剛才成功打通 /data 拿到收盤價，
+     那麼「網域被封鎖」在邏輯上已經被排除 —— 同一個網域不可能只擋某一個路徑。
+     這時候的 Failed to fetch 幾乎一定是「該端點回了錯誤狀態，而錯誤回應沒帶 CORS 標頭」，
+     瀏覽器因此連狀態碼都不給 JS 看。舊版一律說「被瀏覽器攔截」，把使用者導向錯誤方向。 */
+  if(state.live){
+    const ep = (ctx && ctx.endpoint) ? ctx.endpoint : '這個端點';
     return new ApiError(
-      '請求被瀏覽器攔截，沒有送達 FinMind（Failed to fetch）',
-      'blocked',
-      '這不是 Token 錯誤，也不是流量問題——請求連伺服器都沒到。最常見原因是目前的執行環境（預覽視窗／沙盒 iframe）禁止對外部網域發送請求，或對方未回傳跨來源（CORS）標頭。'
+      `${ep} 沒有回應內容（Failed to fetch），但你的連線是正常的`,
+      'endpoint',
+      `同一個瀏覽器、同一個 Token 剛剛才成功取得收盤價，所以「網域被擋」可以排除——沒有任何攔截器會只擋一個路徑。`
+      + `最可能的情況是：FinMind 對這個端點回了錯誤（權限不足或方案不符），而它的錯誤回應沒有附上跨來源（CORS）標頭，`
+      + `瀏覽器就把整個回應丟掉，只留下一句 Failed to fetch 給程式。`
     );
   }
-  return e;
+  return new ApiError(
+    '請求被瀏覽器攔截，沒有送達 FinMind（Failed to fetch）',
+    'blocked',
+    '這不是 Token 錯誤，也不是流量問題——請求連伺服器都沒到。最常見原因是目前的執行環境（預覽視窗／沙盒 iframe）禁止對外部網域發送請求，或對方未回傳跨來源（CORS）標頭。'
+  );
 }
 
 /* 用指定 Token 發一次請求，不觸碰全域 state（診斷專用） */
@@ -1472,6 +1517,8 @@ function drawTaiex(series, ma){
 /* 額度用完、Token 失效、被瀏覽器攔截 —— 這三種繼續打下去只是浪費額度，必須中止 */
 /* 額度用盡 / Token 失效 / 被攔截 —— 連線狀態必須降級，不能繼續顯示綠燈 */
 function degradeConnection(e){
+  /* 端點權限問題（例如即時報價需要 sponsor）不影響主要連線，不得把 state.live 拆掉 */
+  if(e && (e.kind === 'sponsor' || e.kind === 'endpoint')) return;
   if(e && e.kind === 'quota'){
     $('connBadge').className='px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/40 whitespace-nowrap';
     $('connBadge').textContent='🟠 已達 API 流量上限';
@@ -1567,8 +1614,8 @@ async function fetchSnapshot(ids){
     let res;
     try{ res = await fetch(a.url); }
     catch(e){
-      lastErr = classifyFetchError(e);
-      // 只有額度／授權該當場中止；被瀏覽器攔截時應改試另一種呼叫形式
+      lastErr = classifyFetchError(e, { endpoint:'即時報價端點 taiwan_stock_tick_snapshot' });
+      // 只有額度／授權該當場中止；其他情況改試另一種呼叫形式
       if(lastErr.kind === 'quota' || lastErr.kind === 'auth') throw lastErr;
       continue;
     }
@@ -1582,7 +1629,15 @@ async function fetchSnapshot(ids){
     if(!r.length){ lastErr = new ApiError('即時報價回傳空資料','api', j.msg ? String(j.msg) : ''); continue; }
     rows = r; usedHow = a.how; break;
   }
-  if(!rows) throw lastErr || new ApiError('即時報價無法取得','api','');
+  if(!rows){
+    /* 兩種呼叫形式都失敗，而 /data 明明是通的 —— 這是端點層級的權限問題，不是連線問題。
+       FinMind 官方文件標明 taiwan_stock_tick_snapshot「只限 sponsor 會員使用」。 */
+    if(state.live && (!lastErr || lastErr.kind === 'endpoint' || lastErr.kind === 'blocked' || lastErr.kind === 'http')){
+      throw new ApiError('即時報價需要 FinMind sponsor 會員權限', 'sponsor',
+        (lastErr && lastErr.message) ? ('底層錯誤：' + lastErr.message) : '');
+    }
+    throw lastErr || new ApiError('即時報價無法取得','api','');
+  }
 
   logField('即時報價 (tick_snapshot)', '呼叫形式', usedHow);
   logField('即時報價 (tick_snapshot)', '回應欄位', Object.keys(rows[0]).join(', '));
@@ -1892,6 +1947,7 @@ async function fetchOneLive(s, opts={}){
 async function refreshRealtime(){
   if(!state.live){ toast('請先輸入 FinMind Token 並驗證連線。','warn'); return; }
   /* 非交易時段先跳窗說明 —— 這時抓到的只是最後一筆成交，卻照樣消耗額度 */
+  if(!rtForce && rtUnavailable){ showSponsorModal(null); return; }
   if(!rtForce && !marketSession().open){ showSessionModal(true); return; }
   rtForce = false;
   const gen = state.gen;
@@ -1907,6 +1963,8 @@ async function refreshRealtime(){
     }catch(e){
       if(isFatal(e)) throw e;
       // 批次失敗 → 逐檔重試（可能是端點不支援多檔）
+      // 端點權限問題逐檔重試也一定失敗，只是白白多打幾次請求
+      if(e && (e.kind === 'sponsor' || e.kind === 'endpoint')) throw e;
       toast('批次即時報價失敗（' + e.message + '），改為逐檔嘗試…','warn');
       for(const s2 of items){
         try{ const r = await fetchSnapshot(s2.id); Object.assign(map, r.map); }
@@ -1939,9 +1997,10 @@ async function refreshRealtime(){
       n?'ok':'warn');
   }catch(e){
     degradeConnection(e);
-    toast('即時報價失敗：' + e.message, 'err');
+    if(e && e.kind === 'sponsor'){ rtUnavailable = true; showSponsorModal(e); }
+    else toast('即時報價失敗：' + e.message, 'err');
   }finally{
-    setFetchButtons(true); btn.textContent = '⚡ 更新即時報價';
+    setFetchButtons(true); updateRtButton();
   }
 }
 
@@ -2994,6 +3053,7 @@ const GUIDE = [
   TABLE(['限制','說明'],[
    ['流量上限','FinMind 免費方案有每小時請求次數限制，超過會回傳 402。本頁已用「單頁 5 檔 + 每檔間隔 260ms」節流，但短時間內連續翻頁刷新仍可能觸頂。'],
    ['資料延遲','FinMind 為日頻資料，非即時報價。盤中看到的是<strong>前一交易日收盤價</strong>。'],
+   ['即時報價需付費','「⚡ 更新即時報價」用的 <code class="bg-slate-800 px-1 rounded text-[10px]">taiwan_stock_tick_snapshot</code> 端點，FinMind 官方標明<strong>只限 sponsor 會員使用</strong>，免費帳號會被拒絕。被拒絕時瀏覽器只會顯示 <code class="bg-slate-800 px-1 rounded text-[10px]">Failed to fetch</code>（因為錯誤回應沒帶 CORS 標頭），那<strong>不是</strong>你的 Token 或網路有問題。本頁的位階與目標價本來就用收盤價計算，不受影響。'],
    ['財報缺漏','部分公司（尤其 KY 股、金控子公司、新上市股）的 EPS 或資產負債表欄位命名不同，可能抓不到而顯示「—」，此時該檔的長期目標價無法計算。'],
    ['EPS 為負','虧損公司的本益比沒有意義，系統會顯示 ⚪「資料不足」，請改看營收成長與現金流。'],
    ['會存在你的電腦','自選清單、成本價與隱私設定<strong>預設會自動存入這台電腦瀏覽器的儲存空間</strong>，重新整理會自動載回（可在「💾 資料儲存」關閉）。Token 預設<strong>不</strong>儲存，除非你主動勾選。這些資料不會寫進 HTML 檔，也不會上傳到任何伺服器。無痕模式與「清除瀏覽資料」會清掉它們。']
@@ -3574,6 +3634,7 @@ document.addEventListener('click', e=>{
     if(conf==='logout'){ doLogout(); return; }
     if(conf==='addAnyway'){ closeModal(); addForce = true; addStock(); return; }
     if(conf==='rtAnyway'){ closeModal(); rtForce = true; refreshRealtime(); return; }
+    if(conf==='rtRetry'){ closeModal(); rtUnavailable = false; rtForce = true; refreshRealtime(); return; }
     if(conf==='muteSession'){ muteSessionToday(); return; }
     if(conf==='proxyYes'){ state.proxy = state.pendingProxy||''; state.pendingProxy=null;
       $('proxyInput').value = state.proxy; persist(); updateProxyBadge(); closeModal();
@@ -3700,9 +3761,12 @@ function answerRemember(yes){
 }
 
 function setTokenCollapsed(on){
-  const panel = $('tokenPanel'), sum = $('tokenSummary');
+  const panel = $('tokenPanel'), sum = $('tokenSummary'), extras = $('tokenExtras');
   if(!panel || !sum) return;
   sum.setAttribute('aria-expanded', on ? 'false' : 'true');
+  /* 連線成功後，FinMind 說明、提示文字與進階設定一起收起來 —— 這些是「還沒連線」才需要的東西。
+     連線警告（envWarn）刻意留在收合區外，任何時候都看得到。 */
+  if(extras) extras.classList.toggle('hidden', !!on);
   if(on){
     panel.classList.add('hidden');
     sum.classList.remove('hidden'); sum.classList.add('flex');
@@ -3999,6 +4063,7 @@ renderQuiz();
 renderLegend();
 renderAll();
 updateSessionBadge();
+updateRtButton();
 setInterval(updateSessionBadge, 30000);
 scheduleSessionNotice();
 loadMarket();
