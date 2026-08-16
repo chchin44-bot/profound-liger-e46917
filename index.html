@@ -862,13 +862,42 @@ function todayISO(){
   try{ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()); }
   catch(e){ return new Date().toISOString().slice(0,10); }
 }
-/* 成本輸入之後是否發生過除權息／減資？發生過的話，帳面損益一定是錯的。 */
+/* 成本輸入之後是否發生過除權息／減資？發生過的話，帳面損益一定是錯的。
+   優先用官方事件（有配息金額與減資後參考價，算得出建議成本）；
+   沒有官方資料時退回「單日跳空 > 10.5%」的推測（台股漲跌幅上限 ±10%，超過必然是公司行動）。 */
 function costStale(s){
   const d = s.data || {};
-  if(!(s.cost > 0) || !Array.isArray(d.corp) || !d.corp.length) return null;
+  if(!(s.cost > 0)) return null;
+  if(Array.isArray(d.corpEvents) && d.corpEvents.length){
+    const since = s.costAsOf ? d.corpEvents.filter(c=>c.date > s.costAsOf) : d.corpEvents;
+    if(!since.length) return null;
+    return { official:true, events:since, known:!!s.costAsOf, suggest: suggestCost(s, since) };
+  }
+  if(!Array.isArray(d.corp) || !d.corp.length) return null;
   const since = s.costAsOf ? d.corp.filter(c=>c.date > s.costAsOf) : d.corp;
   if(!since.length) return null;
-  return { events: since, known: !!s.costAsOf };
+  return { official:false, events: since, known: !!s.costAsOf };
+}
+/* 依官方事件把成本與股數往回推。除息：成本減去配息；除權／減資：依價格比例換算。 */
+function suggestCost(s, events){
+  let cost = s.cost, shares = s.shares, ok = true;
+  for(const e of events){
+    if(e.kind === 'div'){
+      if(e.amt > 0 && /現金|cash/i.test(e.type||'')) cost -= e.amt;
+      else if(e.before > 0 && e.after > 0){
+        const k = e.after / e.before;            // 含權值調整（配股或現金＋配股）
+        cost *= k; shares = Math.round(shares / k);
+      } else if(e.amt > 0) cost -= e.amt;
+      else ok = false;
+    } else {
+      if(e.before > 0 && e.after > 0){
+        const k = e.after / e.before;            // 減資：參考價上升，股數等比例減少
+        cost *= k; shares = Math.round(shares / k);
+      } else ok = false;
+    }
+  }
+  if(!ok || !(cost > 0) || !(shares > 0)) return null;
+  return { cost:+cost.toFixed(2), shares };
 }
 /* 資料截止日距今幾天（日曆天）。回 null 代表沒有日期可判斷。 */
 function staleDays(asOf){
@@ -1397,6 +1426,34 @@ function epsDeclining(d){
   if(!v.every(x => typeof x === 'number' && isFinite(x))) return false;
   return v[0] > 0 && v[3] < v[2] && v[2] < v[1] && v[1] < v[0];
 }
+/* ══ 分位數工具 ══ */
+function quantile(sorted, f){
+  const n = sorted.length;
+  if(!n) return null;
+  if(n === 1) return sorted[0];
+  const pos = f * (n - 1), lo = Math.floor(pos), hi = Math.min(lo + 1, n - 1);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+}
+/* ══ 個股自身歷史分位（本益比河流圖）══
+   這是整份程式裡唯一「一個編出來的數字都沒有」的判定方式：
+   三條線全部來自證交所公布的、這檔股票自己的歷史本益比分布。
+   中華電跟中華電比、台積電跟台積電比，不需要任何產業分類表或慣用倍數。 */
+const HIST_MIN_POINTS = 250;      // 至少約一年的交易日
+function histBands(hist){
+  if(!Array.isArray(hist)) return null;
+  const xs = hist.filter(v=>isFinite(v) && v > 0).sort((a,b)=>a-b);
+  if(xs.length < HIST_MIN_POINTS) return null;
+  return { cheap:+quantile(xs,0.20).toFixed(1), fair:+quantile(xs,0.50).toFixed(1),
+           rich:+quantile(xs,0.80).toFixed(1), n:xs.length,
+           lo:+xs[0].toFixed(1), hi:+xs[xs.length-1].toFixed(1) };
+}
+/* 現值落在自身歷史的第幾百分位 */
+function histPct(hist, v){
+  if(!Array.isArray(hist) || !isFinite(v)) return null;
+  const xs = hist.filter(x=>isFinite(x) && x > 0);
+  if(xs.length < HIST_MIN_POINTS) return null;
+  return Math.round(xs.filter(x=>x <= v).length / xs.length * 100);
+}
 /* ══ 本益比的產業校正 ══
    負債比早就有產業分流（FIN_IND / HIGH_IND / LEASING_IDS），估值核心卻一直用同一組 12/16/20。
    後果可以用內建基準值直接驗證：10 檔綠燈裡 5 檔金融 + 3 檔航運，而中華電永久停在 🔴。
@@ -1411,28 +1468,70 @@ function industryMedianPE(ind){
   const m = xs.length % 2 ? xs[(xs.length-1)/2] : (xs[xs.length/2-1] + xs[xs.length/2]) / 2;
   return { med:+m.toFixed(1), n:xs.length };
 }
-function peBands(ind){
+/* 產業慣用區間（成長動能、資本支出與景氣循環特性不同，區間寬窄本來就不一樣）。
+   只在「個股自身歷史不足」且「同業樣本不足」時當最後的備援，並且會標明是慣例不是資料。 */
+const IND_ARCHETYPE = [
+  [/金融|保險|銀行|證券|租賃/,                      { lo:10, mid:12.5, hi:15, name:'金融型' }],
+  [/半導體|電腦及週邊|光電|電子零組件|其他電子|資訊服務|數位雲端|生技醫療/,
+                                                    { lo:20, mid:28,   hi:40, name:'科技成長型' }],
+  [/食品|通信網路|油電燃氣|貿易百貨|觀光|居家生活|綠能環保|電子通路/,
+                                                    { lo:10, mid:14,   hi:18, name:'穩定消費／公用型' }],
+  [/水泥|鋼鐵|造紙|玻璃|紡織|橡膠|塑膠|化學|電器電纜|建材|營造|航運|航空|汽車|電機|機械|運動休閒/,
+                                                    { lo:8,  mid:10,   hi:12, name:'成熟傳統型' }]
+];
+function archetypeOf(ind){
+  const t = String(ind||'');
+  for(const [re, a] of IND_ARCHETYPE) if(re.test(t)) return a;
+  return { lo:10, mid:14, hi:18, name:'未分類（採穩定型）' };
+}
+/* 判定基準的優先序：① 個股自身歷史分位 ② 同業橫斷面中位數 ③ 產業慣用區間
+   越前面的越接近「資料自己說的」，越後面的越接近「別人的經驗法則」。 */
+function peBands(ind, d){
+  const hb = d && histBands(d.perHist);
+  if(hb) return { ...hb, basis:'self',
+    label:`這檔自己近 ${(hb.n/250).toFixed(1)} 年的本益比分布（${hb.n} 個交易日，實際區間 ${hb.lo}～${hb.hi} 倍）`,
+    short:'自身歷史分位' };
   const im = industryMedianPE(ind);
-  if(im) return { cheap:+(im.med*0.75).toFixed(1), fair:im.med, rich:+(im.med*1.3).toFixed(1),
-                  basis:'ind', label:`${ind} 同業中位數 ${im.med} 倍（${im.n} 檔）`, n:im.n };
-  return { cheap:12, fair:16, rich:20, basis:'fixed', label:'固定門檻 12／16／20 倍（未經回測）', n:0 };
+  const A = archetypeOf(ind);
+  const rLo = A.lo / A.mid, rHi = A.hi / A.mid;    // 慣例只借「區間寬窄」，中軸用真實資料
+  if(im) return { cheap:+(im.med*rLo).toFixed(1), fair:im.med, rich:+(im.med*rHi).toFixed(1),
+    basis:'ind', n:im.n,
+    label:`${ind} 同業中位數 ${im.med} 倍（${im.n} 檔真實資料），區間寬窄取自「${A.name}」慣例`,
+    short:'同業中位數' };
+  return { cheap:A.lo, fair:A.mid, rich:A.hi, basis:'conv', n:0,
+    label:`${A.name} 的產業慣用區間 ${A.lo}～${A.hi} 倍（業界經驗法則，未經回測）`,
+    short:'產業慣例' };
 }
 function valuate(pe, d){
   const ind = d && d.ind;
-  /* 金融、保險、銀行、證券、租賃：本益比結構性偏低是槓桿與監理資本的結果，不是便宜。
-     用 PE 買金融股，等於系統性地把高槓桿誤判為折價。 */
-  if(pe !== null && isFinite(pe) && pe > 0 && FIN_IND.test(String(ind||'')))
-    return { level:'na', key:'fin', light:'🏦', label:'金融業 · 本益比不適用',
-             cls:'text-sky-300 bg-sky-500/10 border-sky-500/40',
-             note:`金融、保險、銀行、證券與租賃業的本益比（目前 ${fmt(pe,1)} 倍）天生就落在 8～13 倍，那是高槓桿與監理資本結構的結果，不代表便宜。這類公司請改看<strong>股價淨值比（PBR）、資本適足率、逾放比與股利政策</strong>。本系統不對它們輸出便宜／昂貴判定。` };
+  /* 金融、保險、銀行、證券、租賃：實務上看的是股價淨值比，不是本益比。
+     官方 PBR 序列拿得到，就用這檔自己的 PBR 歷史分位判定。 */
+  if(FIN_IND.test(String(ind||''))){
+    const pb = d && d.pbr, hb = d && histBands(d.pbrHist);
+    if(pb > 0 && hb){
+      const pc = histPct(d.pbrHist, pb);
+      const note = `金融業以<strong>股價淨值比（PBR）</strong>判定，不用本益比。目前 PBR <strong>${fmt(pb,2)}</strong>，落在這檔自己近 ${(hb.n/250).toFixed(1)} 年的第 <strong>${pc}</strong> 百分位（歷史區間 ${hb.lo}～${hb.hi}）。請一併確認資本適足率與逾放比。`;
+      if(pb <= hb.cheap) return { level:'buy', key:'cheap', light:'🟢', label:'PBR 歷史低檔（鯨魚吸籌 🐋）', cls:'text-emerald-300 bg-emerald-500/10 border-emerald-500/40', bands:hb, note };
+      if(pb <= hb.fair)  return { level:'hold', key:'fair', light:'🟡', label:'PBR 中位以下', cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:hb, note };
+      if(pb <= hb.rich)  return { level:'hold', key:'warm', light:'🟡', label:'PBR 中位以上', cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:hb, note };
+      return { level:'sell', key:'rich', light:'🔴', label:'PBR 歷史高檔（小豬過載 🐖）', cls:'text-rose-300 bg-rose-500/10 border-rose-500/40', bands:hb, note };
+    }
+    if(pe !== null && isFinite(pe) && pe > 0)
+      return { level:'na', key:'fin', light:'🏦', label:'金融業 · 待取得 PBR 歷史',
+               cls:'text-sky-300 bg-sky-500/10 border-sky-500/40',
+               note:`金融業要用<strong>股價淨值比（PBR）</strong>判定，但目前還沒有足夠的 PBR 歷史（至少需要約一年）。請按「🔄 重新整理本頁」取得官方資料。本益比 ${fmt(pe,1)} 倍對金融股沒有參考價值——那是高槓桿與監理資本結構的結果，不代表便宜。` };
+  }
   if(pe === null || !isFinite(pe) || pe <= 0)
     return { level:'na', key:'na', light:'⚪', label:'資料不足', cls:'text-slate-400 bg-slate-700/30 border-slate-600/40',
              note:'EPS 為負或缺漏，無法以本益比評估，請改看營收與現金流。' };
   /* 安全閘：低本益比 + 獲利連續下滑 = 典型的低本益比陷阱。
      說明頁一直有寫這個盲點（航運／面板／記憶體在獲利高峰顯示「便宜」），現在把它寫進程式裡，
      不再讓這種股票拿到 🟢 綠燈與 🐋 鯨魚。 */
-  const B = peBands(ind);
-  const basisNote = `（判定基準：${B.label}）`;
+  const B = peBands(ind, d);
+  const pctl = (B.basis === 'self') ? histPct(d.perHist, pe) : null;
+  const basisNote = (pctl != null)
+    ? `（現值落在自身歷史第 <strong>${pctl}</strong> 百分位；判定基準：${B.label}）`
+    : `（判定基準：${B.label}）`;
   if(pe < B.cheap && epsDeclining(d))
     return { level:'na', key:'trap', light:'⚠️', label:'本益比失真 · 不判定',
              cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:B,
@@ -1938,7 +2037,8 @@ async function fetchSnapshot(ids){
 }
 
 async function fetchStockLive(s){
-  const out = { price:null, eps:null, debt:null, holder:null, holderPrev:null, series:[], err:null };
+  const out = { price:null, eps:null, debt:null, holder:null, holderPrev:null, series:[], err:null,
+                per:null, pbr:null, divYield:null, perHist:null, pbrHist:null, perAsOf:null };
 
   // 6-0 股票中文名稱與產業（自選標的常常只有代號，這裡向 FinMind 查正確名稱）
   if(!s.nameVerified){
@@ -1959,6 +2059,28 @@ async function fetchStockLive(s){
                  .sort((a,b)=> a.date < b.date ? -1 : (a.date > b.date ? 1 : 0));
     if(ser.length){ out.series = ser; out.price = ser[ser.length-1].close; out.asOf = ser[ser.length-1].date; }
   }catch(e){ if(isFatal(e)) throw e; out.err = e.message; }
+
+  /* 6-1b 官方本益比／股價淨值比／殖利率（證交所每日公布，FinMind 免費層即可取得）
+     舊版是自己用「股價 ÷ 近四季 EPS」算 PE，而那條路是這份程式問題最多的地方：
+     台灣財報累計制(YTD)沒拆單季、四季連續性、財報新鮮度、KY 股與金控子公司抓不到。
+     官方已經算好，直接用；同時拿到 5 年日序列，位階判定就不必再靠任何編出來的倍數。 */
+  try{
+    const pr = await finmind('TaiwanStockPER', { data_id:s.id, start_date: dstr(-1830) });
+    const rows = (pr||[]).map(r=>({ date:r.date, per:+r.PER, pbr:+r.PBR, dy:+r.dividend_yield }))
+                         .filter(x=>x.date)
+                         .sort((a,b)=> a.date < b.date ? -1 : (a.date > b.date ? 1 : 0));
+    if(rows.length){
+      const last = rows[rows.length-1];
+      out.perAsOf   = last.date;
+      out.per       = (isFinite(last.per) && last.per > 0) ? +last.per.toFixed(2) : null;
+      out.pbr       = (isFinite(last.pbr) && last.pbr > 0) ? +last.pbr.toFixed(2) : null;
+      out.divYield  = isFinite(last.dy) ? +last.dy.toFixed(2) : null;
+      out.perHist   = rows.map(x=>x.per).filter(v=>isFinite(v) && v > 0 && v < 300);
+      out.pbrHist   = rows.map(x=>x.pbr).filter(v=>isFinite(v) && v > 0 && v < 50);
+      logField('官方本益比 (TaiwanStockPER)', '回傳筆數', rows.length + ' 筆，截止 ' + last.date);
+      logField('官方本益比 (TaiwanStockPER)', '最新值', `PER ${out.per} / PBR ${out.pbr} / 殖利率 ${out.divYield}%`);
+    }
+  }catch(e){ if(isFatal(e)) throw e; out.err = out.err || e.message; }
 
   // 6-2 EPS（綜合損益表）—— 必須湊滿 4 個連續季度才算 TTM，否則寧可不給
   try{
@@ -2017,6 +2139,37 @@ async function fetchStockLive(s){
       if(asset && isFinite(liab) && liab !== null && liab >= 0) out.debt = +(liab/asset).toFixed(4);
     }
   }catch(e){ if(isFatal(e)) throw e; out.err = out.err || e.message; }
+
+  /* 6-3b 除權息與減資（官方）—— 只對「已加入自選且有填成本」的標的抓，
+     百大資料庫那 100 檔不需要，額度控制得住。
+     舊版是用「單日跳空 > 10.5%」去猜，這裡直接拿官方的配息金額與減資後參考價，
+     所以能算得出「你的成本應該調整成多少」，而不只是提醒你自己去查。 */
+  if(s.inWatch && s.cost > 0){
+    const ev = [];
+    try{
+      const dv = await finmind('TaiwanStockDividendResult', { data_id:s.id, start_date: dstr(-1830) });
+      (dv||[]).forEach(r=>{
+        const before = +r.before_price, after = +r.after_price, amt = +r.stock_and_cache_dividend;
+        if(!r.date) return;
+        ev.push({ kind:'div', date:r.date,
+                  before: isFinite(before)?before:null, after: isFinite(after)?after:null,
+                  amt: isFinite(amt)?amt:null, type: String(r.stock_or_cache_dividend||'') });
+      });
+    }catch(e){ if(isFatal(e)) throw e; }
+    try{
+      const cr = await finmind('TaiwanStockCapitalReductionReferencePrice', { data_id:s.id, start_date: dstr(-1830) });
+      (cr||[]).forEach(r=>{
+        const before = +r.ClosingPriceonTheLastTradingDay, after = +r.PostReductionReferencePrice;
+        if(!r.date) return;
+        ev.push({ kind:'cut', date:r.date,
+                  before: isFinite(before)?before:null, after: isFinite(after)?after:null,
+                  reason: String(r.ReasonforCapitalReduction||'') });
+      });
+    }catch(e){ if(isFatal(e)) throw e; }
+    ev.sort((a,b)=> a.date < b.date ? -1 : (a.date > b.date ? 1 : 0));
+    out.corpEvents = ev.slice(-12);
+    if(ev.length) logField('除權息／減資（官方）', s.id, ev.length + ' 筆，最近 ' + ev[ev.length-1].date);
+  }
 
   // 6-4 千張大戶（1000 張以上持股比例，取最近兩週變動）
   /* FinMind 官方標明 TaiwanStockHoldingSharesPer 只限 backer／sponsor 會員。
@@ -2102,7 +2255,7 @@ function buildTargets(d){
               midBuy:null, midWarn:null, shortBuy:null, shortSell:null };
   if(d.eps && d.eps > 0){
     t.longOk = true;
-    const B = peBands(d.ind);
+    const B = peBands(d.ind, d);
     t.bands = B;
     t.cheap = +(d.eps*B.cheap).toFixed(1);
     t.fair  = +(d.eps*B.fair).toFixed(1);
@@ -2120,7 +2273,9 @@ function reapply(s, src){
   applyStockData(s, {
     price:d.price, eps:d.eps, debt:d.debt, holder:d.holder, holderPrev:d.holderPrev,
     series:d.series, asOf:d.asOf, epsNote:d.epsNote, holderNote:d.holderNote,
-    epsQuarters:d.epsQuarters, epsVals:d.epsVals, err:d.err
+    epsQuarters:d.epsQuarters, epsVals:d.epsVals, err:d.err,
+    per:d.per, pbr:d.pbr, divYield:d.divYield, perHist:d.perHist, pbrHist:d.pbrHist, perAsOf:d.perAsOf,
+    corpEvents:d.corpEvents
   }, src || d.src);
 }
 function applyStockData(s, d, src){
@@ -2132,7 +2287,11 @@ function applyStockData(s, d, src){
     holder: d.holder, holderPrev: d.holderPrev,
     series: d.series || [],
     ...tech,
-    pe: (price && d.eps && d.eps>0) ? +(price/d.eps).toFixed(2) : null,
+    /* 本益比一律優先採用官方數字；自算值只在官方缺漏時備援，並標明來源 */
+    per: d.per ?? null, pbr: d.pbr ?? null, divYield: d.divYield ?? null,
+    perHist: d.perHist || null, pbrHist: d.pbrHist || null, perAsOf: d.perAsOf || null,
+    peSrc: (d.per > 0) ? 'official' : ((price && d.eps && d.eps>0) ? 'calc' : null),
+    pe: (d.per > 0) ? d.per : ((price && d.eps && d.eps>0) ? +(price/d.eps).toFixed(2) : null),
     pnl: (price && s.cost>0) ? +((price - s.cost)/s.cost*100).toFixed(2) : null,
     err: d.err || null,
     src: src || (s.data && s.data.src) || 'mock',
@@ -2145,6 +2304,7 @@ function applyStockData(s, d, src){
     asOf: d.asOf || null,
     ind: s.ind || null,        // 讓 valuate 能做產業校正，不必改動 8 個呼叫點
     corp: corpActions(d.series || []),
+    corpEvents: d.corpEvents || null,
     epsNote: d.epsNote || null,
     holderNote: d.holderNote || null,
     epsQuarters: d.epsQuarters || null,
@@ -2185,7 +2345,10 @@ async function refreshCurrentPage(which='w'){
   const label = which==='w' ? '自選清單' : '百大資料庫';
   if(!items.length){ toast('本頁沒有可更新的股票。','warn'); return; }
   btn.textContent = '⏳ 抓取中…'; setFetchButtons(false);
-  if(state.live) toast(`本頁 ${items.length} 檔，約送出 ${items.length * callsPerStock()} 次 API 請求。`, 'info');
+  if(state.live){
+    const nq = items.reduce((a,x)=> a + callsPerStock(x.inWatch && x.cost > 0), 0);
+    toast(`本頁 ${items.length} 檔，約送出 ${nq} 次 API 請求。`, 'info');
+  }
   try{
   if(state.live){
     let ok = 0, fail = 0, aborted = false;
@@ -2343,9 +2506,12 @@ async function refreshRealtime(){
 /* ══════════════════════════════════════════════════════════════
    6-B. 批次抓取：一次把整份清單抓完（含進度、併發控制與中止）
    ══════════════════════════════════════════════════════════════ */
-/* 集保停用後每檔只剩 3 次；免費帳號實測會省下 25% 的額度 */
-function callsPerStock(){ return state.holderUnavailable ? 3 : 4; }
-const CALLS_PER_STOCK = 4;      // 保留常數供說明文字引用
+/* 每檔的請求數：價格 + 官方PER + 財報 + 資產負債表（+集保，免費帳號會自動停用）。
+   自選清單且有填成本的標的另加 2 次（除權息、減資），百大資料庫不加。 */
+function callsPerStock(watch){
+  return 4 + (state.holderUnavailable ? 0 : 1) + (watch ? 2 : 0);
+}
+const CALLS_PER_STOCK = 5;      // 保留常數供說明文字引用
 const BULK_CONCURRENCY = 3;     // 同時最多 3 檔，兼顧速度與 API 禮貌
 
 /* 批次進行中鎖住所有會發 API 的按鈕，避免重複請求把額度打掉 */
@@ -2375,7 +2541,7 @@ async function fetchAll(which){
   }
 
   const extraName = items.filter(x=>!x.nameVerified).length;
-  const calls = items.length * callsPerStock() + extraName;
+  const calls = items.reduce((a,x)=> a + callsPerStock(x.inWatch && x.cost > 0), 0) + extraName;
   const secs = Math.ceil(items.length / BULK_CONCURRENCY * 1.1);
 
   showModal({ icon:'⚡', title:`批次抓取 ${label}（${items.length} 檔）`,
@@ -2532,6 +2698,7 @@ function renderTable(){
     const d = s.data || {};
     const t = d.targets;
     const real = dataReal(d);
+    const pctSelf = (real && d.perHist) ? histPct(d.perHist, d.pe) : null;
     const v = real ? valuate(d.pe ?? null, d) : (d.src === 'mock' ? VAL_DEMO : VAL_NONE);
     const animals = (s.loaded && real) ? stockAnimals({ id:s.id, pe:d.pe??null, holder:d.holder??null, holderPrev:d.holderPrev??null, debt:d.debt??null, pnl:d.pnl??null, ind:s.ind, epsVals:d.epsVals??null }) : [];
     const croc = animals.includes('croc');
@@ -2556,10 +2723,15 @@ function renderTable(){
         <div class="mt-0.5">${srcBadge(d)}</div>
       </td>
       <td class="px-2.5 py-2 text-right tabular-nums font-semibold ${pnlCls} m-lab" data-label="未實現損益">${d.pnl==null?'—':SENS(pct(d.pnl))}
-        ${cs ? `<div class="text-[10px] text-amber-300 font-normal mt-0.5" title="${esc(cs.events.map(e=>e.date+' '+(e.pct>0?'+':'')+e.pct+'%').join('、'))}">⚠ 成本可能已過期</div>` : ''}</td>
+        ${cs ? `<div class="text-[10px] text-amber-300 font-normal mt-0.5" title="${esc(cs.official
+              ? cs.events.map(e=>e.date+' '+(e.kind==='cut'?'減資':'除權息')).join('、')
+              : cs.events.map(e=>e.date+' '+(e.pct>0?'+':'')+e.pct+'%').join('、'))}">⚠ 成本已過期${cs.official&&cs.suggest?`（建議 ${fmt(cs.suggest.cost,2)}）`:''}</div>` : ''}</td>
       <td class="px-2.5 py-2 text-right tabular-nums ${hCls} m-lab" data-label="千張大戶">${d.holder==null?'—':pct(d.holder)}</td>
       <td class="px-2.5 py-2 text-right tabular-nums ${debtCls} m-lab" data-label="負債比">${d.debt==null?'—':(d.debt*100).toFixed(1)+'%'}</td>
-      <td class="px-2.5 py-2 text-right tabular-nums text-slate-300 m-lab" data-label="本益比">${d.pe==null?'—':fmt(d.pe,1)}</td>
+      <td class="px-2.5 py-2 text-right tabular-nums text-slate-300 m-lab" data-label="本益比">${d.pe==null?'—':fmt(d.pe,1)}
+        ${d.peSrc==='official' ? '<div class="text-[10px] text-emerald-400/80 font-normal">官方</div>'
+          : (d.peSrc==='calc' ? '<div class="text-[10px] text-slate-500 font-normal">自算</div>' : '')}
+        ${pctSelf!=null ? `<div class="text-[10px] text-cyan-300 font-normal">歷史 ${pctSelf}%</div>` : ''}</td>
       <td class="px-2.5 py-2 m-lab" data-label="動物狀態"><div class="flex flex-wrap gap-1">${animals.map(k=>animalTag(k, s.ind)).join('') || '<span class="text-slate-400 text-[10px]">—</span>'}</div></td>
       <td class="px-2.5 py-2 m-lab" data-label="長線位階">
         <div class="tag border ${v.cls} px-2 py-1">${v.light} ${v.label}</div>
@@ -2599,6 +2771,7 @@ function renderTop100(){
   } else body.innerHTML = items.map(s=>{
     const d = s.data || {};
     const real = dataReal(d);
+    const pctSelf = (real && d.perHist) ? histPct(d.perHist, d.pe) : null;
     const v = real ? valuate(d.pe ?? null, d) : (d.src === 'mock' ? VAL_DEMO : VAL_NONE);
     const animals = (s.loaded && real) ? stockAnimals({ id:s.id, pe:d.pe??null, holder:d.holder??null, holderPrev:d.holderPrev??null, debt:d.debt??null, pnl:null, ind:s.ind, epsVals:d.epsVals??null }) : [];
     const hCls = d.holder==null ? 'text-slate-400' : d.holder>=0 ? 'text-cyan-300' : 'text-slate-400';
@@ -2614,7 +2787,10 @@ function renderTop100(){
         <div class="tabular-nums font-semibold ${(d.src==='live'||d.src==='rt')?'text-white':'text-slate-400'}">${d.price==null?'—':fmt(d.price)}</div>
         <div class="mt-0.5">${srcBadge(d)}</div>
       </td>
-      <td class="px-2.5 py-2 text-right tabular-nums text-slate-300 m-lab" data-label="本益比">${d.pe==null?'—':fmt(d.pe,1)}</td>
+      <td class="px-2.5 py-2 text-right tabular-nums text-slate-300 m-lab" data-label="本益比">${d.pe==null?'—':fmt(d.pe,1)}
+        ${d.peSrc==='official' ? '<div class="text-[10px] text-emerald-400/80 font-normal">官方</div>'
+          : (d.peSrc==='calc' ? '<div class="text-[10px] text-slate-500 font-normal">自算</div>' : '')}
+        ${pctSelf!=null ? `<div class="text-[10px] text-cyan-300 font-normal">歷史 ${pctSelf}%</div>` : ''}</td>
       <td class="px-2.5 py-2 text-right tabular-nums ${debtCls} m-lab" data-label="負債比">${d.debt==null?'—':(d.debt*100).toFixed(1)+'%'}</td>
       <td class="px-2.5 py-2 text-right tabular-nums ${hCls} m-lab" data-label="千張大戶">${d.holder==null?'—':pct(d.holder)}</td>
       <td class="px-2.5 py-2 m-lab" data-label="動物狀態"><div class="flex flex-wrap gap-1">${animals.map(k=>animalTag(k, s.ind)).join('') || '<span class="text-slate-400 text-[10px]">—</span>'}</div></td>
@@ -3439,6 +3615,9 @@ const GUIDE = [
    ['流量上限','FinMind 免費方案有每小時請求次數限制，超過會回傳 402。本頁已用「單頁 5 檔 + 每檔間隔 260ms」節流，但短時間內連續翻頁刷新仍可能觸頂。'],
    ['資料延遲','FinMind 為日頻資料，非即時報價。盤中看到的是<strong>前一交易日收盤價</strong>。'],
    ['千張大戶需付費','「千張大戶變動」用的 <code class="bg-slate-800 px-1 rounded text-[10px]">TaiwanStockHoldingSharesPer</code> 資料集，FinMind 官方標明<strong>只限 backer／sponsor 會員使用</strong>。免費帳號抓不到，因此這一欄會顯示「—」、🐋 鯨魚永遠不會亮、策略卡 E 也永遠不會觸發。系統偵測到之後會<strong>自動停用這個請求</strong>，每檔省下 1 次額度（總量的 25%）。'],
+   ['本益比改用官方數字','「本益比」欄位取自 <code class="bg-slate-800 px-1 rounded text-[10px]">TaiwanStockPER</code>（證交所每日公布的個股本益比、股價淨值比與殖利率，FinMind 免費層即可取得），標示為 <span class="text-emerald-400">官方</span>。舊版是用「股價 ÷ 近四季 EPS」自己算，那條路會被台灣財報的<strong>累計制(YTD)</strong>、四季不連續、財報過期、KY 股與金控子公司抓不到等問題影響。官方數字缺漏時才退回自算，並標示為 <span class="text-slate-400">自算</span>。'],
+   ['位階怎麼判定的','優先序有三層，畫面上會標明用的是哪一層：<br>① <strong>這檔自己的歷史分位</strong>——用官方 PER 的近 5 年日序列取第 20／50／80 百分位。<strong>三條線一個編出來的數字都沒有</strong>，中華電跟中華電比、台積電跟台積電比。需要至少約一年的資料。<br>② <strong>同業橫斷面中位數</strong>——同產業已取得真實資料的股票中位數當中軸，區間寬窄取自產業慣例。<br>③ <strong>產業慣用區間</strong>——金融型 10～15、科技成長型 20～40、穩定消費／公用型 10～18、成熟傳統型 8～12。<strong>這一層是業界經驗法則，未經回測</strong>，只在前兩層都湊不到資料時使用。<br>金融保險業一律改用<strong>股價淨值比（PBR）</strong>的自身歷史分位，因為那才是實務上看金融股的方式。'],
+   ['除權息與減資','自選清單中<strong>有填成本</strong>的標的，會另外抓 <code class="bg-slate-800 px-1 rounded text-[10px]">TaiwanStockDividendResult</code> 與 <code class="bg-slate-800 px-1 rounded text-[10px]">TaiwanStockCapitalReductionReferencePrice</code>（兩者免費）。若你輸入成本之後發生過除權息或減資，損益欄會出現「⚠ 成本已過期」並附上<strong>建議的調整後成本</strong>。系統<strong>不會自動改你的數字</strong>，請自行核對券商對帳單後用 ✏️ 更新。'],
    ['即時報價需付費','「⚡ 更新即時報價」用的 <code class="bg-slate-800 px-1 rounded text-[10px]">taiwan_stock_tick_snapshot</code> 端點，FinMind 官方標明<strong>只限 sponsor 會員使用</strong>，免費帳號會被拒絕。被拒絕時瀏覽器只會顯示 <code class="bg-slate-800 px-1 rounded text-[10px]">Failed to fetch</code>（因為錯誤回應沒帶 CORS 標頭），那<strong>不是</strong>你的 Token 或網路有問題。本頁的位階與目標價本來就用收盤價計算，不受影響。'],
    ['財報缺漏','部分公司（尤其 KY 股、金控子公司、新上市股）的 EPS 或資產負債表欄位命名不同，可能抓不到而顯示「—」，此時該檔的長期目標價無法計算。'],
    ['EPS 為負','虧損公司的本益比沒有意義，系統會顯示 ⚪「資料不足」，請改看營收成長與現金流。'],
