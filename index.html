@@ -249,6 +249,25 @@
      不用 !important：位移是靠 CSS 變數傳進來的，inline style 不會被蓋掉。 */
   .toast-sa{ top: var(--toast-y, 76px); bottom: auto; }
 
+  /* v65 黃色警語收合。
+     警語不能拿掉——但也不該每一次都佔掉半個畫面。折衷是：
+     **最關鍵的那一句永遠看得見**（那一句本身就是操作性的警告），其餘收進 <details>。
+     用原生 <details> 而不是自己寫 JS：鍵盤、螢幕閱讀器都直接支援，
+     而且下面那條 @media print 會強制展開，所以「印一份給人看」不會漏掉警語。 */
+  .warnbox > summary{ list-style:none; cursor:pointer; display:flex; align-items:center;
+                      justify-content:space-between; gap:10px; min-height:48px; padding:8px 12px; }
+  .warnbox > summary::-webkit-details-marker{ display:none; }
+  .warnbox > summary:focus-visible{ outline:2px solid #f59e0b; outline-offset:2px; border-radius:10px; }
+  .warnmore{ display:inline-flex; align-items:center; justify-content:center; min-height:40px;
+             font-size:12px; font-weight:600; color:#fcd34d; white-space:nowrap;
+             border:1px solid rgba(245,158,11,.5); border-radius:8px; padding:0 10px; }
+  .warnbox:not([open]) .warnmore::after{ content:'展開全部 ▾'; }
+  .warnbox[open]      .warnmore::after{ content:'收起 ▴'; }
+  @media print{
+    .warnbox > summary .warnmore{ display:none; }
+    .warnbox > .warnbody{ display:block !important; }   /* 列印一律展開 */
+  }
+
   /* 新增標的表單：標籤／輸入框／提示三層固定高度，桌機版才不會因為只有部分欄位有提示而錯位 */
   .af      { display:flex; flex-direction:column; min-width:0; }
   .af-lab  { display:block; height:15px; line-height:15px; margin-bottom:4px;
@@ -1485,6 +1504,57 @@ function updateRtButton(){
     ? 'FinMind 的即時報價端點只開放 sponsor 會員。點我看說明。'
     : '把自選清單的價格換成最後一筆成交（均線與布林仍為前一交易日）';
 }
+/* 黃色警語：標題那一句永遠看得見，其餘收起來。
+   標題本身就是完整的一句操作性警告，收起來之後畫面上仍然讀得到「這不是該買賣的價格」。 */
+function warnBox(head, body){
+  return `<details class="warnbox rounded-xl border-2 border-amber-500/60 bg-amber-500/10 mb-3 text-amber-100">
+    <summary><span class="font-bold text-[15px] leading-snug">⚠ ${head}</span><span class="warnmore"></span></summary>
+    <div class="warnbody px-3 pb-3 text-[14px] leading-relaxed">${body}</div>
+  </details>`;
+}
+
+/* 把每一種呼叫形式實際的結果印成一張表。沒有量到就說沒有量到，不補字。 */
+function rtTraceTable(e){
+  const tr = (e && Array.isArray(e.trace)) ? e.trace : [];
+  if(!tr.length) return '<div class="text-[13px] text-slate-500">（這一次沒有留下逐項紀錄）</div>';
+  return '<div class="space-y-1.5">' + tr.map(t=>{
+    const okish = /^HTTP 200/.test(t.what) && /✓/.test(t.what);
+    const cls = okish ? 'text-emerald-300' : (/^HTTP \d/.test(t.what) ? 'text-amber-200' : 'text-rose-300');
+    return `<div class="text-[13px] leading-snug">
+      <div class="text-slate-300">${esc(t.how)}</div>
+      <div class="${cls} break-all">→ ${esc(t.what)}</div></div>`;
+  }).join('') + '</div>';
+}
+/* 依「量到什麼」給結論。三種情況要講三種不同的話，不能共用一段免責。 */
+function rtTraceVerdict(e){
+  const tr = (e && Array.isArray(e.trace)) ? e.trace : [];
+  const box = (cls, title, html) =>
+    `<div class="rounded-lg ${cls} p-3 text-[14px] leading-relaxed"><div class="font-bold mb-1">${title}</div>${html}</div><br>`;
+  const anyHttp  = tr.some(t => /^HTTP \d/.test(t.what));
+  const readable = tr.filter(t => /^HTTP \d/.test(t.what) && /—/.test(t.what));
+  if(readable.length){
+    return box('bg-emerald-500/10 border border-emerald-500/40 text-emerald-200',
+      '這次有問到原因了',
+      `對方<strong>有回應</strong>，而且回應內容就在上面那張表裡（<code class="bg-slate-900 px-1 rounded">—</code> 後面那一段）。
+       那段字是 FinMind 自己寫的，照著它處理就對了：<br>
+       提到 sponsor／權限 → 帳號層級，去問 FinMind；<br>
+       提到參數／422 → 是程式送錯東西，把整段字給我，我改。`);
+  }
+  if(anyHttp){
+    return box('bg-amber-500/10 border border-amber-500/40 text-amber-200',
+      '對方有回應，但沒有說明原因',
+      `上面看得到 HTTP 狀態碼，代表請求<strong>有送到</strong>、也<strong>有回來</strong>，
+       所以不是防火牆、也不是你的網路。狀態碼本身就是線索，把它告訴我。`);
+  }
+  return box('bg-amber-500/10 border border-amber-500/40 text-amber-200',
+    '連狀態碼都拿不到 —— 所以分不出原因',
+    `每一種都是 <code class="bg-slate-900 px-1 rounded">Failed to fetch</code>，那是<strong>瀏覽器層</strong>的失敗，
+     程式拿不到任何回應內容。在 JavaScript 裡，下面三件事長得一模一樣：<br>
+     ・對方拒絕，但錯誤回應沒帶跨來源（CORS）標頭<br>
+     ・<code class="bg-slate-900 px-1 rounded">Authorization</code> 標頭觸發 preflight，而對方沒有回應 preflight<br>
+     ・請求根本沒出去（防火牆、擴充套件、公司網路）<br>
+     <strong>所以這一頁不會告訴你是哪一個。</strong>下面那個 30 秒的自我測試可以分出來。`);
+}
 function showSponsorModal(e){
   /* v62：整個改寫。舊版斷言「你是免費帳號、需要 sponsor」——
      實際發生過的情況是：使用者**已經是 sponsor**（2026/08/05 Backer、08/10 升級 Sponsor），
@@ -1497,27 +1567,17 @@ function showSponsorModal(e){
      從 ③ 分不出「權限不足」「preflight 被擋」「端點變更」哪一個。所以就不要分。 */
   showModal({ icon:'', title:'即時報價拿不到，原因分不出來',
     body:`<div class="text-[15px] leading-relaxed">
-      先講**確定**的部分：<strong class="text-emerald-300">你的 Token 沒問題，連線也沒問題。</strong>
+      先講<strong class="text-white">確定</strong>的部分：<strong class="text-emerald-300">你的 Token 沒問題，連線也沒問題。</strong>
       剛剛「重新整理本頁」拿到的收盤價就是證據。
       </div><br>
       <div class="rounded-lg bg-slate-800/60 border border-slate-700 p-3 text-[14px] leading-relaxed">
-        <div class="text-slate-300 font-bold mb-1">程式試過這幾種，全部失敗</div>
-        <div class="text-[13px] text-slate-400">
-          FinMind 官方文件對即時報價端點給的範例是把 Token 放在
-          <code class="bg-slate-900 px-1 rounded">Authorization: Bearer</code> 標頭裡，
-          所以帶標頭與不帶標頭、專屬端點與 <code class="bg-slate-900 px-1 rounded">/data?dataset=</code>，四種組合都試過了。
+        <div class="text-slate-300 font-bold mb-1">程式試了這幾種，每一種實際回什麼</div>
+        <div class="text-[13px] text-slate-400 mb-2">
+          這張表是<strong class="text-slate-300">剛剛跑完之後填的</strong>，不是事先寫好的字。
         </div>
+        ${rtTraceTable(e)}
       </div><br>
-      <div class="rounded-lg bg-amber-500/10 border border-amber-500/40 text-amber-200 p-3 text-[14px] leading-relaxed">
-        <div class="font-bold mb-1">為什麼分不出原因</div>
-        四種都回 <code class="bg-slate-900 px-1 rounded">Failed to fetch</code>。
-        那是**瀏覽器層**的失敗，程式拿不到任何回應內容。
-        在 JavaScript 裡，下面三件事長得一模一樣：<br>
-        ・對方拒絕，但錯誤回應沒帶跨來源標頭<br>
-        ・<code class="bg-slate-900 px-1 rounded">Authorization</code> 標頭觸發 preflight，而對方沒有回應 preflight<br>
-        ・請求根本沒出去（防火牆、擴充套件、公司網路）<br>
-        <strong>所以這一頁不會告訴你是哪一個。</strong>
-      </div><br>
+      ${rtTraceVerdict(e)}
       <div class="rounded-lg bg-slate-800/60 border border-slate-700 p-3 text-[14px] leading-relaxed">
         <div class="text-slate-300 font-bold mb-1">你可以自己確認是哪一個（30 秒）</div>
         <div class="text-[13px] text-slate-400">
@@ -2373,7 +2433,7 @@ function peBands(ind, d){
   const hb = d && histBands(d.perHist);
   if(hb && perTrending(d.perHist))
     return { ...hb, basis:'self', trending:true,
-      label:`⚠ 這檔的本益比在近 ${(hb.n/250).toFixed(1)} 年是一條<strong>持續上修或下修的趨勢</strong>，不是一個穩定的區間。用分位數比較會系統性地說它「便宜」，請格外小心（實際區間 ${hb.lo}～${hb.hi} 倍）`,
+      label:`⚠ 這檔的本益比在近 ${(hb.n/250).toFixed(1)} 年是一條「持續上修或下修的趨勢」，不是一個穩定的區間。用分位數比較會系統性地說它「便宜」，請格外小心（實際區間 ${hb.lo}～${hb.hi} 倍）`,
       short:'自身歷史分位（趨勢中）' };
   if(hb) return { ...hb, basis:'self',
     label:`這檔自己近 ${(hb.n/250).toFixed(1)} 年的本益比分布（${hb.n} 個交易日，實際區間 ${hb.lo}～${hb.hi} 倍）`,
@@ -2791,6 +2851,12 @@ async function fetchSnapshot(ids){
     { url: buildUrlFor(EP.data, Object.assign({ dataset:'taiwan_stock_tick_snapshot' }, idParam)),
       headers: null, how: '/data?dataset= + ?token=' }
   ].filter(a => a.headers !== null || !hdr || !a.how.includes('標頭'));
+  /* v65：每一種呼叫形式**實際**發生了什麼，一律記下來。
+     上一版的彈窗直接寫死一句「四種都回 Failed to fetch」——那是我猜的，不是量到的。
+     這正是這份程式反覆犯的同一個錯：把「我不知道」寫成「我知道」。
+     現在改成：底下那張表是程式跑完之後填的，不是我事先寫好的。 */
+  const trace = [];
+  const note = (how, what) => trace.push({ how, what });
   let lastErr = null, rows = null, usedHow = '';
   for(const a of attempts){
     let res;
@@ -2798,20 +2864,34 @@ async function fetchSnapshot(ids){
     catch(e){
       lastErr = classifyFetchError(e, { endpoint:'即時報價端點 taiwan_stock_tick_snapshot' });
       lastErr._how = a.how;
+      note(a.how, (e && e.name ? e.name + ': ' : '') + (e && e.message ? e.message : String(e)));
       // 只有額度／授權該當場中止；其他情況改試另一種呼叫形式
-      if(lastErr.kind === 'quota' || lastErr.kind === 'auth') throw lastErr;
+      if(lastErr.kind === 'quota' || lastErr.kind === 'auth'){ lastErr.trace = trace; throw lastErr; }
       continue;
     }
-    if(res.status === 401) throw new ApiError('Token 無效或已過期（401）','auth','');
-    if(res.status === 402) throw new ApiError('已達 API 流量上限（402）','quota','');
-    if(!res.ok){ lastErr = new ApiError('即時報價回應 HTTP ' + res.status, 'http',
-      res.status===404 ? '此呼叫形式不存在，改試另一種。' : ''); continue; }
+    /* 非 2xx 也要把內容讀出來。FinMind 這種 FastAPI 服務會在 body 裡寫明原因
+       （權限不足、參數錯誤 422 等），舊版直接丟掉，等於把唯一的線索扔了。 */
+    if(!res.ok){
+      let msg = '';
+      try{ msg = (await res.text()).replace(/\s+/g,' ').slice(0, 300); }catch(e){}
+      note(a.how, 'HTTP ' + res.status + (msg ? ' — ' + msg : '（回應沒有內容）'));
+      if(res.status === 401){ const er = new ApiError('Token 無效或已過期（401）','auth', msg); er.trace = trace; throw er; }
+      if(res.status === 402){ const er = new ApiError('已達 API 流量上限（402）','quota', msg); er.trace = trace; throw er; }
+      lastErr = new ApiError('即時報價回應 HTTP ' + res.status, 'http', msg ||
+        (res.status===404 ? '此呼叫形式不存在，改試另一種。' : ''));
+      continue;
+    }
     let j; try{ j = await res.json(); }
-    catch(e){ lastErr = new ApiError('即時報價回應不是有效的 JSON','parse',''); continue; }
+    catch(e){ note(a.how, 'HTTP 200，但回應不是有效的 JSON'); lastErr = new ApiError('即時報價回應不是有效的 JSON','parse',''); continue; }
     const r = Array.isArray(j.data) ? j.data : (Array.isArray(j) ? j : []);
-    if(!r.length){ lastErr = new ApiError('即時報價回傳空資料','api', j.msg ? String(j.msg) : ''); continue; }
+    if(!r.length){
+      note(a.how, 'HTTP 200，但沒有資料' + (j.msg ? '（' + String(j.msg).slice(0,200) + '）' : ''));
+      lastErr = new ApiError('即時報價回傳空資料','api', j.msg ? String(j.msg) : ''); continue;
+    }
+    note(a.how, 'HTTP 200，取得 ' + r.length + ' 筆 ✓');
     rows = r; usedHow = a.how; break;
   }
+  trace.forEach(t => logField('即時報價 (tick_snapshot)', t.how, t.what));
   if(!rows){
     /* v62：四種呼叫形式都失敗。**不要再宣稱知道原因。**
        舊版一律說「需要 sponsor 會員」，但使用者可能已經是 sponsor（實際發生過），
@@ -2820,11 +2900,14 @@ async function fetchSnapshot(ids){
        這兩種在 JavaScript 裡跟「被防火牆擋住」長得一模一樣。
        誠實的說法是：列出試過哪幾種、底層錯誤是什麼，然後說我們分不出來。 */
     if(state.live){
-      throw new ApiError('即時報價拿不到，而且分不出是哪一種原因', 'rtunknown',
+      const er = new ApiError('即時報價拿不到，而且分不出是哪一種原因', 'rtunknown',
         `已試過 ${attempts.length} 種呼叫形式（${attempts.map(a=>a.how).join('、')}），全部失敗。`
         + (lastErr && lastErr.message ? `底層錯誤：${lastErr.message}` : '')
         + (lastErr && lastErr._how ? `（最後失敗於：${lastErr._how}）` : ''));
+      er.trace = trace;
+      throw er;
     }
+    if(lastErr) lastErr.trace = trace;
     throw lastErr || new ApiError('即時報價無法取得','api','');
   }
 
@@ -2847,6 +2930,23 @@ async function fetchSnapshot(ids){
       '回應欄位為：' + Object.keys(rows[0]).join(', '));
   }
   return { map: out, batch: Object.keys(out).length > 1, how: usedHow, total: rows.length };
+}
+
+/* 把「累計制(YTD)」的季度序列還原成近四季合計。
+   Q4（12-31）那一列本身就是全年，直接用。
+   其餘期別：本年累計 ＋ 去年全年 − 去年同期累計。缺任何一塊就回 null，不估、不補。 */
+function ttmFromYTD(map){
+  if(!(map instanceof Map) || !map.size) return null;
+  const dates = [...map.keys()].sort();
+  const last = dates[dates.length - 1];
+  const y = +String(last).slice(0,4), md = String(last).slice(5,10);
+  if(md === '12-31') return { value: map.get(last), asOf: last, how: '全年報表' };
+  const prevFY   = `${y-1}-12-31`;
+  const prevSame = `${y-1}-${md}`;
+  if(!map.has(prevFY) || !map.has(prevSame)) return null;
+  const v = map.get(last) + map.get(prevFY) - map.get(prevSame);
+  return { value: v, asOf: last,
+           how: `${last} 累計 ＋ ${y-1} 全年 − ${prevSame} 累計` };
 }
 
 async function fetchStockLive(s){
@@ -2952,8 +3052,61 @@ async function fetchStockLive(s){
       const liab = liabHit ? liabHit.value : null;
       const asset = assetHit ? assetHit.value : null;
       if(asset && isFinite(liab) && liab !== null && liab >= 0) out.debt = +(liab/asset).toFixed(4);
+      /* 同一批資料順便取股本與權益總額，供自由現金流換算每股。不額外發請求。 */
+      const capHit = pickByType(rows, ['OrdinaryShare','CapitalStock','普通股股本','股本合計'], /ordinaryshare|capitalstock/i);
+      const eqHit  = pickByType(rows, ['Equity','TotalEquity','權益總額'], /^equity$/i);
+      if(capHit && capHit.value > 0) out.capStock = capHit.value;
+      if(eqHit  && eqHit.value  > 0) out.equity   = eqHit.value;
+      out.bsAsOf = latest;
     }
   }catch(e){ if(isFatal(e)) throw e; out.err = out.err || e.message; }
+
+  /* 6-3c 自由現金流（官方現金流量表）——只對自選標的抓，百大 100 檔不抓，額度控制得住。
+     自由現金流 ＝ 營業活動淨現金流入 − 資本支出（取得不動產、廠房及設備）
+     為什麼值得加：盈餘是會計數字（折舊怎麼提、認列早晚都能影響），現金是真的有沒有進來。
+     對不看線圖的人來說它也最好懂——「這家公司一年生出來的現金，等於你買價的百分之幾」，跟收租一樣。
+
+     ⚠ 台灣財報是**累計制(YTD)**：Q2 那一列是「上半年累計」，不是單季。
+     實測（台積電 2025）：Q1 6,256 億 → H1 11,226 億 → Q3 15,495 億 → 全年 22,750 億。
+     所以近四季必須這樣湊：  本年累計 ＋ 去年全年 − 去年同期累計。
+     四塊拼圖缺一塊就不給數字，也不猜——這是當初自算本益比翻車的同一個坑。 */
+  if(s.inWatch){
+    try{
+      const cf = await finmind('TaiwanStockCashFlowsStatement', { data_id:s.id, start_date: dstr(-1000) });
+      const ctypes = [...new Set((cf||[]).map(r=>String(r.type||'')))];
+      logField('現金流量表 (CashFlowsStatement)', '可用 type', ctypes.slice(0,20).join(', ') + (ctypes.length>20?' …':''));
+      const ocfType = ctypes.find(t=>/^NetCashInflowFromOperatingActivities$/i.test(t))
+                   || ctypes.find(t=>/netcash.*operating|operating.*netcash/i.test(t));
+      const capType = ctypes.find(t=>/^PropertyAndPlantAndEquipment$/i.test(t))
+                   || ctypes.find(t=>/property.*plant.*equipment/i.test(t));
+      logField('現金流量表 (CashFlowsStatement)', '營業活動欄位', ocfType || '（找不到）');
+      logField('現金流量表 (CashFlowsStatement)', '資本支出欄位', capType || '（找不到）');
+      if(!ocfType || !capType){
+        out.fcfNote = '這檔的現金流量表沒有可辨識的「營業活動淨現金流」或「取得不動產廠房設備」欄位。';
+      } else {
+        const pick = t => { const m = new Map();
+          (cf||[]).forEach(r=>{ if(String(r.type)===t && r.date && isFinite(+r.value) && !m.has(r.date)) m.set(r.date, +r.value); });
+          return m; };
+        const ocfM = pick(ocfType), capM = pick(capType);
+        const ttm = ttmFromYTD(ocfM), ctm = ttmFromYTD(capM);
+        if(!ttm || !ctm){
+          out.fcfNote = (ttm||ctm) ? '現金流量表的季度不齊，湊不滿近四季。' : '還沒有足夠的現金流量表資料。';
+        } else if(ttm.asOf !== ctm.asOf){
+          out.fcfNote = '營業現金流與資本支出的期別對不上，不合併計算。';
+        } else {
+          /* 資本支出在報表上本來就是負數（現金流出）。取絕對值再減，
+             這樣不論 FinMind 給的是正是負，結果都一樣。 */
+          out.ocfTTM   = ttm.value;
+          out.capexTTM = Math.abs(ctm.value);
+          out.fcfTTM   = +(ttm.value - Math.abs(ctm.value)).toFixed(0);
+          out.fcfAsOf  = ttm.asOf;
+          out.fcfHow   = ttm.how;
+          logField('現金流量表 (CashFlowsStatement)', '近四季自由現金流',
+            `${(out.fcfTTM/1e8).toFixed(0)} 億元（營業 ${(out.ocfTTM/1e8).toFixed(0)} − 資本支出 ${(out.capexTTM/1e8).toFixed(0)}），截止 ${out.fcfAsOf}（${out.fcfHow}）`);
+        }
+      }
+    }catch(e){ if(isFatal(e)) throw e; out.fcfNote = out.fcfNote || ('現金流量表抓取失敗：' + e.message); }
+  }
 
   /* 6-3b 除權息與減資（官方）—— 只對「已加入自選且有填成本」的標的抓，
      百大資料庫那 100 檔不需要，額度控制得住。
@@ -3170,7 +3323,12 @@ function applyStockData(s, d, src){
     epsNote: d.epsNote || null,
     holderNote: d.holderNote || null,
     epsQuarters: d.epsQuarters || null,
-    epsVals: d.epsVals || null
+    epsVals: d.epsVals || null,
+    /* 自由現金流（近四季）與換算每股所需的股本／權益。都是官方財報原始數字，
+       殖利率本身在 fcfYield() 裡每次現算，不凍在這裡——凍住就會變成第 N 份手抄副本。 */
+    ocfTTM: d.ocfTTM ?? null, capexTTM: d.capexTTM ?? null, fcfTTM: d.fcfTTM ?? null,
+    fcfAsOf: d.fcfAsOf || null, fcfHow: d.fcfHow || null, fcfNote: d.fcfNote || null,
+    capStock: d.capStock ?? null, equity: d.equity ?? null, bsAsOf: d.bsAsOf || null
   };
   /* 目標價每次讀取時重算，不凍進 d.targets——peBands 不是純函式
      （它經由 industryMedianPE 讀 state.watchlist 的當下內容），
@@ -3219,7 +3377,7 @@ async function refreshCurrentPage(){
   if(!items.length){ toast('本頁沒有可更新的股票。','warn'); return; }
   btn.textContent = '⏳ 抓取中…'; setFetchButtons(false);
   if(state.live){
-    const nq = items.reduce((a,x)=> a + callsPerStock(x.inWatch && x.cost > 0), 0);
+    const nq = items.reduce((a,x)=> a + callsPerStock(x.inWatch), 0);
     toast(`本頁 ${items.length} 檔，約送出 ${nq} 次 API 請求。`, 'info');
   }
   try{
@@ -3386,8 +3544,13 @@ async function refreshRealtime(){
    ══════════════════════════════════════════════════════════════ */
 /* 每檔的請求數：價格 + 官方PER + 財報 + 資產負債表（+集保，免費帳號會自動停用）。
    自選清單且有填成本的標的另加 2 次（除權息、減資），百大資料庫不加。 */
+/* 每檔的請求數。自選標的多三個：除權息、減資、現金流量表。
+   v65 修正兩件事：
+   ① 舊版呼叫端傳的是「inWatch 且有填成本」，但程式裡這三個請求的條件是 s.inWatch（不看成本），
+      於是沒填成本的自選股會低報。條件要跟真正發請求的地方同一個。
+   ② 加了現金流量表（自由現金流），數字要跟著加。 */
 function callsPerStock(watch){
-  return 4 + (state.holderUnavailable ? 0 : 1) + (watch ? 2 : 0);
+  return 4 + (state.holderUnavailable ? 0 : 1) + (watch ? 3 : 0);
 }
 const CALLS_PER_STOCK = 5;      // 保留常數供說明文字引用
 const BULK_CONCURRENCY = 3;     // 同時最多 3 檔，兼顧速度與 API 禮貌
@@ -3419,7 +3582,7 @@ async function fetchAll(which){
   }
 
   const extraName = items.filter(x=>!x.nameVerified).length;
-  const calls = items.reduce((a,x)=> a + callsPerStock(x.inWatch && x.cost > 0), 0) + extraName;
+  const calls = items.reduce((a,x)=> a + callsPerStock(x.inWatch), 0) + extraName;
   const secs = Math.ceil(items.length / BULK_CONCURRENCY * 1.1);
 
   showModal({ icon:'⚡', title:`批次抓取 ${label}（${items.length} 檔）`,
@@ -3703,6 +3866,54 @@ function perBaseClose(d){
   if(d.src !== 'rt' && d.price > 0) return d.price;
   return null;
 }
+/* ══ 自由現金流殖利率 ══════════════════════════════════════════
+   ＝ 每股自由現金流 ÷ 股價 ＝ 近四季自由現金流 ÷ 市值（兩種寫法同一件事）
+
+   股數怎麼來：台灣上市普通股面額幾乎一律 10 元，所以 股數 ＝ 普通股股本 ÷ 10。
+   但「幾乎」不等於「一定」，所以另外用官方數字做一次獨立驗算：
+       由 PBR 反推的股數 ＝ 權益總額 × PBR ÷ 股價
+   兩者差超過 15% 就代表面額假設在這一檔不成立（或權益含大額非控制權益），
+   那就**不給數字**，而不是給一個看起來很具體的錯數字。
+
+   分母用哪個價格：跟本益比同一個錨——官方 PER 那一天的收盤。
+   否則盤中每跳動一次，這個「殖利率」就變一次，跟今天剛修掉的目標價問題是同一個。 */
+const FCF_SHARE_TOL = 0.15;
+function fcfYield(d){
+  if(!d || !(d.fcfTTM != null) || !(d.capStock > 0)) return null;
+  const px = perBaseClose(d) || d.price;
+  if(!(px > 0)) return null;
+  const shares = d.capStock / 10;
+  if(!(shares > 0)) return null;
+  let crossOk = null, implied = null;
+  if(d.equity > 0 && d.pbr > 0){
+    implied = d.equity * d.pbr / px;
+    crossOk = Math.abs(implied - shares) / shares <= FCF_SHARE_TOL;
+  }
+  if(crossOk === false) return { blocked:true, why:'股數對不起來', shares, implied };
+  const perShare = d.fcfTTM / shares;
+  return { yield: +(perShare / px * 100).toFixed(2), perShare: +perShare.toFixed(2),
+           shares, px, crossOk, asOf: d.fcfAsOf, how: d.fcfHow,
+           ocf: d.ocfTTM, capex: d.capexTTM, fcf: d.fcfTTM };
+}
+/* 一句白話。數字單獨出現一定被誤讀，所以永遠附一句解釋它是什麼。 */
+function fcfLine(d){
+  if(isFinancial(d && d.ind, d && d.id))
+    return '<span class="text-slate-500">金融業不適用自由現金流（銀行沒有「資本支出」這回事，現金進出主要是存放款）。</span>';
+  const f = fcfYield(d);
+  if(!f) return d && d.fcfNote
+    ? `<span class="text-slate-500">${safeText(d.fcfNote,160)}</span>`
+    : '<span class="text-slate-500">還沒有這檔的現金流量表，按「重新整理本頁」取得。</span>';
+  if(f.blocked)
+    return '<span class="text-slate-500">這檔的股本與淨值對不起來（可能不是 10 元面額），為避免算錯，不顯示每股現金流。</span>';
+  if(f.fcf < 0)
+    return `<span class="text-rose-300 font-semibold">這家公司近四季<strong>沒有生出自由現金</strong>：`
+         + `賺到的現金 ${fmt(f.ocf/1e8,0)} 億，花在買設備蓋廠 ${fmt(f.capex/1e8,0)} 億，倒欠 ${fmt(Math.abs(f.fcf)/1e8,0)} 億。</span>`
+         + `<span class="text-slate-400"> 配息要靠借錢或動用老本。這不一定是壞事（可能在擴產），但配息的安全性要另外看。</span>`;
+  return `這家公司近四季真正生出來的現金，每股 <strong class="text-slate-200">${fmt(f.perShare,2)} 元</strong>，`
+       + `等於用 ${fmt(f.px)} 元買進的 <strong class="text-emerald-300">${fmt(f.yield,2)}%</strong>。`
+       + `<span class="text-slate-400">（營業賺到 ${fmt(f.ocf/1e8,0)} 億 − 買設備蓋廠 ${fmt(f.capex/1e8,0)} 億，截止 ${esc(String(f.asOf||''))}）</span>`;
+}
+
 function buildTargets(d){
   const t = { longOk:false, cheap:null, fair:null, rich:null,
               midBuy:null, midWarn:null, shortBuy:null, shortSell:null };
@@ -4058,15 +4269,13 @@ function targetPanelHTML(s){
   const bnd = (t.bands || peBands(d.ind, d));
 
   return `
-  <div class="rounded-xl border-2 border-amber-500/60 bg-amber-500/10 p-3 mb-3 text-[14px] leading-relaxed text-amber-100">
-    <div class="font-bold text-[15px] mb-1.5">⚠ 下面的價格是「算式的答案」，不是「該買賣的價格」</div>
+  ${warnBox('下面的價格是「算式的答案」，不是「該買賣的價格」', `
     它們只是把公開的本益比、均線、標準差代進公式算出來的數字。<br>
     這些公式<strong>不知道</strong>這家公司接下來會發生什麼事，也<strong>不知道</strong>你幾歲、這筆錢什麼時候要用、能承受多少虧損。<br>
     本頁不推介任何個股、不提供買賣建議、不保證任何報酬，也不會因為你的任何操作而獲得任何報酬。<br>
     <strong>看到綠色不代表可以買，看到紅色不代表必須賣。</strong><br>
     ⚠ 台股單日漲跌幅上限 ±10%。這些價位不代表你掛得到單——連續跌停時買不到、連續漲停時賣不掉。
-    若這檔被列為「處置股票」，撮合會變成 5 或 20 分鐘一次並須預收全額款券。下單前請向你的營業員確認交易狀態。
-  </div>
+    若這檔被列為「處置股票」，撮合會變成 5 或 20 分鐘一次並須預收全額款券。下單前請向你的營業員確認交易狀態。`)}
   <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
     <div>
       <div class="mb-2">
@@ -4087,6 +4296,13 @@ function targetPanelHTML(s){
         ${card(trapped?`⚠️ EPS×${bnd.rich} 參考值`:'🔴 本益比高檔換算價', t.rich, `EPS × ${bnd.rich} 倍`, 'text-rose-300', 'border-rose-500/35 bg-rose-500/[.08]')}
       </div>
       <div class="text-[10px] text-slate-500 mt-1">倍數基準：${esc(bnd.label)}</div>
+
+      <!-- v65：自由現金流殖利率。本益比看的是「帳上賺多少」，這一條看的是「真的收到多少現金」。
+           兩個並列而不是取代——高資本支出的公司兩者會差一倍以上，那個落差本身就是資訊。 -->
+      <div class="rounded-lg border border-slate-600/50 bg-slate-800/40 p-2.5 mt-3 text-[13px] leading-relaxed">
+        <div class="text-[11px] text-slate-400 mb-1">💵 這家公司一年真正生出來的現金（官方現金流量表）</div>
+        <div class="text-slate-300">${fcfLine(d)}</div>
+      </div>
       ${trapped ? `<div class="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-200 p-2 text-[11px] leading-relaxed">
         ⚠️ 這檔近 4 季 EPS 逐季下滑，本益比估值法在此時會嚴重失真（低本益比陷阱）。
         上面三個數字只是「EPS × 倍數」的算式輸出，<strong>不代表這檔便宜或昂貴</strong>。請改看營收年增率與毛利率趨勢。
@@ -5177,18 +5393,27 @@ function closeModal(){ const m=$('modal'); m.classList.add('hidden'); m.classLis
    起點是頁首的實際高度：頁首是 sticky top-0，字級大時會變高，寫死數字就會疊到它上面。
    量不到頁首時退回 76px（字級「中」實測高度）。 */
 function toastTop(){
-  try{
-    const h = document.querySelector('header');
-    const n = h ? h.getBoundingClientRect().height : 0;
-    return (n > 0 ? n : 64) + 12;
-  }catch(e){ return 76; }
+  /* v65 最終版：一律貼在畫面頂端 12px。
+     試過「掛在頁首下緣」，在這個版面行不通——版面順序是「首屏金額區 → 頁首 → 其餘」，
+     而字級「大」時光是首屏金額區就有 1000px，比整個手機螢幕還高，
+     頁首下緣會落在畫面外，三則提示就全部跑到看不見的地方。
+     再把它夾回畫面內，落點就正好壓在「印一份給人看」上——繞一圈回到原本要修的那個問題。
+     實測結論：在 390×844 上，沒有任何一個固定位置能同時避開金額與按鈕，只能選代價最小的那個。
+     頂端 12px 蓋到的是「我現在賺賠多少錢」那行小標題——不是金額本身，也不是任何按鈕。 */
+  return 12;
 }
 function reflowToasts(){
   const list = [...document.querySelectorAll('.toast-sa')];
-  let y = toastTop();
+  const step = el => Math.max(56, el.offsetHeight + 12);
+  const stack = list.reduce((a, el) => a + step(el), 0);
+  const vh = window.innerHeight || 844;
+  /* 先算整疊的高度，再決定起點：字級「大」時首屏金額區本身就比一個螢幕還高，
+     頁首下緣會落到 1016px——照抄下去三則提示會全部跑到畫面外，
+     使用者按了按鈕卻什麼回應都看不到。所以起點要往回夾，保證整疊都在畫面內。 */
+  let y = Math.max(12, Math.min(toastTop(), vh - stack - 12));
   for(let i = 0; i < list.length; i++){
     list[i].style.setProperty('--toast-y', y + 'px');
-    y += Math.max(56, list[i].offsetHeight + 12);
+    y += step(list[i]);
   }
 }
 /* toast 固定在右下角，而彈窗的按鈕也在下方 —— 實測在字級「大」之下，
@@ -5199,16 +5424,24 @@ const toastQueue = [];
 function anyModalOpen(){
   return ['modal','bigModal','guideModal'].some(id=>{ const el=document.getElementById(id); return el && !el.classList.contains('hidden'); });
 }
+/* v65：畫面上一次只放**一則**提示，其餘排隊。
+   量出來的理由：390×844、字級「大」時，首屏的大字金額落在 y=108，
+   而第二則提示的下緣就已經到 121——第三則一定會蓋住金額。
+   把它縮窄或往下挪都只是換一個東西被蓋住（實測全部試過）。
+   一次一則對這個 app 的使用者本來也比較好：讀完一句，再讀下一句。 */
+function toastsOnScreen(){ return document.querySelectorAll('.toast-sa').length; }
 function flushToasts(){
   if(anyModalOpen()) return;
-  while(toastQueue.length){ const q = toastQueue.shift(); showToast(q.msg, q.kind); }
+  while(toastQueue.length && toastsOnScreen() === 0){
+    const q = toastQueue.shift(); showToast(q.msg, q.kind);
+  }
+}
+function queueToast(msg, kind){
+  if(toastQueue.length < 5 && !toastQueue.some(q=>q.msg === msg)) toastQueue.push({msg, kind});
+  try{ const lr = document.getElementById(kind==='err' ? 'liveAlert' : 'liveRegion'); if(lr) lr.textContent = msg; }catch(e){}
 }
 function toast(msg, kind='info'){
-  if(anyModalOpen()){
-    if(toastQueue.length < 5 && !toastQueue.some(q=>q.msg === msg)) toastQueue.push({msg, kind});
-    try{ const lr = document.getElementById(kind==='err' ? 'liveAlert' : 'liveRegion'); if(lr) lr.textContent = msg; }catch(e){}
-    return;
-  }
+  if(anyModalOpen() || toastsOnScreen() > 0){ queueToast(msg, kind); return; }
   showToast(msg, kind);
 }
 function showToast(msg, kind='info'){
@@ -5227,7 +5460,7 @@ function showToast(msg, kind='info'){
   reflowToasts();
   const hold = state.fontScale === 'big' ? 9000 : (state.fontScale === 'mid' ? 6500 : 4200);
   setTimeout(()=>{ el.style.transition='opacity .4s'; el.style.opacity='0';
-                   setTimeout(()=>{ el.remove(); reflowToasts(); },400); }, hold);
+                   setTimeout(()=>{ el.remove(); reflowToasts(); flushToasts(); },400); }, hold);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -5622,6 +5855,11 @@ function cacheOf(x){
        比 v38 的「全部變成 —」更危險。 */
     perRows:(d.perRows||[]).slice(-1300).filter(r=>r&&r.date).map(r=>[r.date, r.per]),
     corpEvents:d.corpEvents || null,
+    /* v65：自由現金流那一組也要進快取。漏掉的話「重新整理本頁」看得到、
+       重開瀏覽器就不見了——perRows 當初就是這樣掉的。 */
+    ocfTTM:d.ocfTTM ?? null, capexTTM:d.capexTTM ?? null, fcfTTM:d.fcfTTM ?? null,
+    fcfAsOf:d.fcfAsOf || null, fcfHow:d.fcfHow || null, fcfNote:d.fcfNote || null,
+    capStock:d.capStock ?? null, equity:d.equity ?? null, bsAsOf:d.bsAsOf || null,
     series:(d.series||[]).slice(-1300).map(r=>[r.date, r.close])
   };
 }
@@ -5642,6 +5880,14 @@ function sanitizeCache(c){
        舊版夾在 [0,100]，於是每次重新整理都把負值靜默清成 null ——
        🦈 鯊魚（大戶連兩週減持）從來沒有在任何一次重新整理之後存在過。 */
     holder:num(c.holder,-100,100), holderPrev:num(c.holderPrev,-100,100),
+    /* v65 自由現金流：金額以「元」為單位，台積電量級 1e12，上限給到 1e15；
+       且可以是負的（鴻海近四季就是負的），下限必須讓負值過得去。 */
+    ocfTTM:num(c.ocfTTM,-1e15,1e15), capexTTM:num(c.capexTTM,0,1e15), fcfTTM:num(c.fcfTTM,-1e15,1e15),
+    capStock:num(c.capStock,0,1e15), equity:num(c.equity,0,1e16),
+    fcfAsOf:(typeof c.fcfAsOf==='string' && /^\d{4}-\d{2}-\d{2}$/.test(c.fcfAsOf)) ? c.fcfAsOf : null,
+    bsAsOf:(typeof c.bsAsOf==='string' && /^\d{4}-\d{2}-\d{2}$/.test(c.bsAsOf)) ? c.bsAsOf : null,
+    fcfHow: typeof c.fcfHow==='string' ? c.fcfHow.slice(0,120) : null,
+    fcfNote: typeof c.fcfNote==='string' ? c.fcfNote.slice(0,300) : null,
     asOf:(typeof c.asOf==='string' && /^\d{4}-\d{2}-\d{2}$/.test(c.asOf)) ? c.asOf : null,
     epsNote: c.epsNote ? String(c.epsNote).slice(0,200) : null,
     holderNote: c.holderNote ? String(c.holderNote).slice(0,200) : null,
