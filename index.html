@@ -1428,25 +1428,55 @@ function updateRtButton(){
     : '把自選清單的價格換成最後一筆成交（均線與布林仍為前一交易日）';
 }
 function showSponsorModal(e){
-  showModal({ icon:'🔒', title:'即時報價需要 FinMind sponsor 會員',
-    body:`先講結論：<strong class="text-emerald-300">你的 Token 沒問題，連線也沒問題。</strong>剛剛「重新整理本頁」拿到的收盤價就是證據。<br><br>
-      FinMind 官方文件把即時報價端點標示為
-      <code class="bg-slate-800 px-1 rounded text-[10px] break-all">taiwan_stock_tick_snapshot</code>
-      <strong class="text-amber-300">「只限 sponsor 會員使用」</strong>。免費帳號呼叫它會被拒絕。<br><br>
-      <div class="rounded-lg bg-slate-800/60 border border-slate-700 p-2.5 text-[11px] leading-relaxed">
-        <div class="text-slate-400 mb-1">為什麼錯誤訊息看起來像「被攔截」</div>
-        FinMind 回的是錯誤狀態，但那個錯誤回應<strong>沒有附上跨來源（CORS）標頭</strong>，
-        瀏覽器就把整個回應丟掉，只留下一句 <code class="bg-slate-900 px-1 rounded">Failed to fetch</code> 給程式。
-        從 JavaScript 的角度，「被防火牆擋住」和「對方拒絕但沒帶標頭」長得一模一樣——舊版因此誤判成連線問題。
+  /* v62：整個改寫。舊版斷言「你是免費帳號、需要 sponsor」——
+     實際發生過的情況是：使用者**已經是 sponsor**（2026/08/05 Backer、08/10 升級 Sponsor），
+     畫面卻還在叫他去升級。那不是不精確，那是講了一件我們不知道的事。
+
+     我們真正知道的只有這些：
+       ① /data 端點是通的（收盤價拿得到）
+       ② 即時報價端點四種呼叫形式全部失敗
+       ③ 失敗的形式是 Failed to fetch —— 瀏覽器層，沒有可讀的回應內容
+     從 ③ 分不出「權限不足」「preflight 被擋」「端點變更」哪一個。所以就不要分。 */
+  showModal({ icon:'', title:'即時報價拿不到，原因分不出來',
+    body:`<div class="text-[15px] leading-relaxed">
+      先講**確定**的部分：<strong class="text-emerald-300">你的 Token 沒問題，連線也沒問題。</strong>
+      剛剛「重新整理本頁」拿到的收盤價就是證據。
       </div><br>
-      <div class="rounded-lg bg-emerald-500/10 border border-emerald-500/40 text-emerald-200 p-2.5 text-[11px] leading-relaxed">
+      <div class="rounded-lg bg-slate-800/60 border border-slate-700 p-3 text-[14px] leading-relaxed">
+        <div class="text-slate-300 font-bold mb-1">程式試過這幾種，全部失敗</div>
+        <div class="text-[13px] text-slate-400">
+          FinMind 官方文件對即時報價端點給的範例是把 Token 放在
+          <code class="bg-slate-900 px-1 rounded">Authorization: Bearer</code> 標頭裡，
+          所以帶標頭與不帶標頭、專屬端點與 <code class="bg-slate-900 px-1 rounded">/data?dataset=</code>，四種組合都試過了。
+        </div>
+      </div><br>
+      <div class="rounded-lg bg-amber-500/10 border border-amber-500/40 text-amber-200 p-3 text-[14px] leading-relaxed">
+        <div class="font-bold mb-1">為什麼分不出原因</div>
+        四種都回 <code class="bg-slate-900 px-1 rounded">Failed to fetch</code>。
+        那是**瀏覽器層**的失敗，程式拿不到任何回應內容。
+        在 JavaScript 裡，下面三件事長得一模一樣：<br>
+        ・對方拒絕，但錯誤回應沒帶跨來源標頭<br>
+        ・<code class="bg-slate-900 px-1 rounded">Authorization</code> 標頭觸發 preflight，而對方沒有回應 preflight<br>
+        ・請求根本沒出去（防火牆、擴充套件、公司網路）<br>
+        <strong>所以這一頁不會告訴你是哪一個。</strong>
+      </div><br>
+      <div class="rounded-lg bg-slate-800/60 border border-slate-700 p-3 text-[14px] leading-relaxed">
+        <div class="text-slate-300 font-bold mb-1">你可以自己確認是哪一個（30 秒）</div>
+        <div class="text-[13px] text-slate-400">
+          把下面這一行貼到瀏覽器網址列（Token 換成你自己的），直接看它回什麼：<br>
+          <code class="bg-slate-900 px-1 rounded break-all text-[12px]">https://api.finmindtrade.com/api/v4/taiwan_stock_tick_snapshot?data_id=2330&amp;token=你的Token</code><br>
+          回得出 JSON → 是瀏覽器的跨來源限制，跟你的會員資格無關。<br>
+          回 401／402／權限訊息 → 才是帳號層級的問題，那時再去問 FinMind。
+        </div>
+      </div><br>
+      <div class="rounded-lg bg-emerald-500/10 border border-emerald-500/40 text-emerald-200 p-3 text-[14px] leading-relaxed">
         <div class="font-bold mb-1">實際影響：幾乎沒有</div>
         本頁所有位階、目標價與策略判定<strong>本來就是用收盤價計算</strong>的。
-        「重新整理本頁」與「抓取全部自選」用的是免費的
-        <code class="bg-slate-900 px-1 rounded text-[10px]">/data</code> 端點，那才是這個儀表板真正需要的資料。
-        即時報價只是把價格換成最後一筆成交，均線與布林通道仍然是前一交易日——參考價值本來就有限。
+        「重新整理本頁」與「抓取全部自選」用的是 <code class="bg-slate-900 px-1 rounded">/data</code> 端點，
+        那才是這個儀表板真正需要的資料。
+        即時報價只是把價格換成最後一筆成交，均線與布林通道仍然是前一交易日。
       </div>
-      ${e && e.detail ? `<div class="text-[10px] text-slate-500 mt-2">${esc(e.detail)}</div>` : ''}`,
+      ${e && e.detail ? `<div class="text-[12px] text-slate-500 mt-2 leading-relaxed">${esc(e.detail)}</div>` : ''}`,
     actions:`<button data-conf="close" class="flex-1 py-2 rounded-lg text-xs font-semibold bg-slate-700 hover:bg-slate-600">了解</button>`
           + `<button data-conf="rtRetry" class="flex-1 py-2 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-400">仍要再試一次</button>` });
 }
@@ -2568,7 +2598,7 @@ function secsToNextHour(){
 /* 額度用盡 / Token 失效 / 被攔截 —— 連線狀態必須降級，不能繼續顯示綠燈 */
 function degradeConnection(e){
   /* 端點權限問題（例如即時報價需要 sponsor）不影響主要連線，不得把 state.live 拆掉 */
-  if(e && (e.kind === 'sponsor' || e.kind === 'endpoint')) return;
+  if(e && (e.kind === 'sponsor' || e.kind === 'rtunknown' || e.kind === 'endpoint')) return;
   const kind = e && e.kind;
 
   if(kind === 'quota'){
@@ -2679,18 +2709,33 @@ const RT_RATE_KEYS   = ['change_rate','changeRate'];
 
 async function fetchSnapshot(ids){
   const list = ids == null ? [] : (Array.isArray(ids) ? ids : [ids]);
-  // FinMind 文件同時出現兩種呼叫形式，這裡先試專屬端點，404 再退回 /data?dataset=
+  /* v62：FinMind 官方文件（finmind.github.io/tutor/TaiwanMarket/RealTime/）對
+     taiwan_stock_tick_snapshot 給的範例是把 Token 放在**標頭**：
+         headers = {"Authorization": f"Bearer {token}"}
+     而舊版四個呼叫形式全部只送 `?token=`、一個標頭都沒有。
+     使用者已經是 sponsor 會員，卻一直拿到「需要 sponsor 會員」——**那個診斷是錯的**。
+
+     為什麼還要保留 `?token=` 那兩種：Authorization 是自訂標頭，會讓瀏覽器先送一個
+     preflight OPTIONS。如果 FinMind 沒有對這個端點回應 preflight，帶標頭的請求會在
+     瀏覽器層直接失敗（Failed to fetch），而不帶標頭的簡單請求反而可能通。
+     兩種都試，並且**記錄下實際是哪一種成功的**，不要再用猜的。 */
+  const idParam = list.length ? { data_id: list.join(',') } : {};
+  const hdr = state.token ? { Authorization: 'Bearer ' + state.token } : null;
   const attempts = [
-    { url: buildUrlFor(EP.snapshot, list.length ? { data_id: list.join(',') } : {}), how: '專屬端點' },
-    { url: buildUrlFor(EP.data, Object.assign({ dataset:'taiwan_stock_tick_snapshot' },
-                                              list.length ? { data_id: list.join(',') } : {})), how: '/data?dataset=' }
-  ];
+    { url: buildUrlFor(EP.snapshot, idParam, false), headers: hdr, how: '專屬端點 + Authorization 標頭' },
+    { url: buildUrlFor(EP.snapshot, idParam),        headers: null, how: '專屬端點 + ?token=' },
+    { url: buildUrlFor(EP.data, Object.assign({ dataset:'taiwan_stock_tick_snapshot' }, idParam), false),
+      headers: hdr, how: '/data?dataset= + Authorization 標頭' },
+    { url: buildUrlFor(EP.data, Object.assign({ dataset:'taiwan_stock_tick_snapshot' }, idParam)),
+      headers: null, how: '/data?dataset= + ?token=' }
+  ].filter(a => a.headers !== null || !hdr || !a.how.includes('標頭'));
   let lastErr = null, rows = null, usedHow = '';
   for(const a of attempts){
     let res;
-    try{ res = await fetch(a.url); }
+    try{ res = await fetch(a.url, a.headers ? { headers: a.headers } : undefined); }
     catch(e){
       lastErr = classifyFetchError(e, { endpoint:'即時報價端點 taiwan_stock_tick_snapshot' });
+      lastErr._how = a.how;
       // 只有額度／授權該當場中止；其他情況改試另一種呼叫形式
       if(lastErr.kind === 'quota' || lastErr.kind === 'auth') throw lastErr;
       continue;
@@ -2706,11 +2751,17 @@ async function fetchSnapshot(ids){
     rows = r; usedHow = a.how; break;
   }
   if(!rows){
-    /* 兩種呼叫形式都失敗，而 /data 明明是通的 —— 這是端點層級的權限問題，不是連線問題。
-       FinMind 官方文件標明 taiwan_stock_tick_snapshot「只限 sponsor 會員使用」。 */
-    if(state.live && (!lastErr || lastErr.kind === 'endpoint' || lastErr.kind === 'blocked' || lastErr.kind === 'http')){
-      throw new ApiError('即時報價需要 FinMind sponsor 會員權限', 'sponsor',
-        (lastErr && lastErr.message) ? ('底層錯誤：' + lastErr.message) : '');
+    /* v62：四種呼叫形式都失敗。**不要再宣稱知道原因。**
+       舊版一律說「需要 sponsor 會員」，但使用者可能已經是 sponsor（實際發生過），
+       而 401/402 在上面就已經被丟出去了——走到這裡代表我們拿到的是
+       「瀏覽器層的 Failed to fetch」或「非 2xx 但沒有可讀的內容」，
+       這兩種在 JavaScript 裡跟「被防火牆擋住」長得一模一樣。
+       誠實的說法是：列出試過哪幾種、底層錯誤是什麼，然後說我們分不出來。 */
+    if(state.live){
+      throw new ApiError('即時報價拿不到，而且分不出是哪一種原因', 'rtunknown',
+        `已試過 ${attempts.length} 種呼叫形式（${attempts.map(a=>a.how).join('、')}），全部失敗。`
+        + (lastErr && lastErr.message ? `底層錯誤：${lastErr.message}` : '')
+        + (lastErr && lastErr._how ? `（最後失敗於：${lastErr._how}）` : ''));
     }
     throw lastErr || new ApiError('即時報價無法取得','api','');
   }
@@ -3095,7 +3146,8 @@ function loadStockMock(s){
   applyStockData(s, { price:m.price, eps:m.eps, debt:m.debt, holder:m.holder, holderPrev:m.holderPrev, series }, 'mock');
 }
 
-async function refreshCurrentPage(which='w'){
+/* v62：參數拿掉。留著一個被忽略的參數，就是在邀請下一個呼叫者再犯一次同樣的錯。 */
+async function refreshCurrentPage(){
   const items = pageItems();
   const btn = $('refreshBtn');
   const redraw = renderTable;
@@ -3220,7 +3272,7 @@ async function refreshRealtime(){
       if(isFatal(e)) throw e;
       // 批次失敗 → 逐檔重試（可能是端點不支援多檔）
       // 端點權限問題逐檔重試也一定失敗，只是白白多打幾次請求
-      if(e && (e.kind === 'sponsor' || e.kind === 'endpoint')) throw e;
+      if(e && (e.kind === 'sponsor' || e.kind === 'rtunknown' || e.kind === 'endpoint')) throw e;
       toast('批次即時報價失敗（' + e.message + '），改為逐檔嘗試…','warn');
       for(const s2 of items){
         try{ const r = await fetchSnapshot(s2.id); Object.assign(map, r.map); }
@@ -3258,7 +3310,7 @@ async function refreshRealtime(){
       n?'ok':'warn');
   }catch(e){
     degradeConnection(e);
-    if(e && e.kind === 'sponsor'){ rtUnavailable = true; showSponsorModal(e); }
+    if(e && (e.kind === 'sponsor' || e.kind === 'rtunknown')){ rtUnavailable = true; showSponsorModal(e); }
     else toast('即時報價失敗：' + e.message, 'err');
   }finally{
     setFetchButtons(true); updateRtButton();
@@ -6060,7 +6112,7 @@ document.addEventListener('click', e=>{
   /* 使用者按「重新整理」是在說「我要最新的」。舊版 30 分鐘內按幾次都是 no-op，
      卻照樣更新 fetchedAt、照樣顯示「更新完成」、照樣先預告「約送出 7 次請求」。
      行情類（價格／本益比／集保）先清掉，財報與除權息維持快取。 */
-  if(t.id==='refreshBtn'){ dropQuoteCache(); refreshCurrentPage('w'); return; }
+  if(t.id==='refreshBtn'){ dropQuoteCache(); refreshCurrentPage(); return; }
   if(t.id==='connBadge'){
     if(state.connKind === 'auth' || !state.token){ setTokenCollapsed(false); $('tokenInput').focus(); return; }
     if(state.connKind === 'down' || state.connKind === 'quota'){
@@ -6341,8 +6393,13 @@ async function verifyToken(){
     askRemember();
     persist();
     toast('FinMind 連線成功，正在載入大盤與本頁個股…','ok');
-    await refreshCurrentPage('w');
-    await refreshCurrentPage('t');
+    loadMarket();
+    /* v62：舊版這裡呼叫兩次——'w' 自選清單、't' 百大資料庫。
+       但第十二輪刪掉百大分頁之後，refreshCurrentPage **完全忽略 which 參數**
+       （函式裡寫死 pageItems()／renderTable／'自選清單'），
+       於是這兩行變成「把自選清單連抓兩次」，API 額度也跟著double。
+       使用者實際回報：「自選會連續抓兩次」。 */
+    await refreshCurrentPage();
   }catch(err){
     state.live=false;
     const kind = err.kind || 'unknown';
@@ -6844,6 +6901,11 @@ catch(err){
 updateSessionBadge();
 updateRtButton();
 updateMockButton();
+/* v62：區塊 A 大盤。上面那段註解自己就寫著「後面的 applyFontScale／loadMarket／時段徽章」——
+   但 loadMarket 在第十二輪刪區塊 A 時一起被拿掉，v61 把區塊 A 裝回來卻沒有把這一行接回去，
+   於是大盤圖永遠是空的。而 r13/v61.mjs 只驗了 `#taiexChart` **存在**，沒驗它有沒有資料，
+   所以測試全綠。跟 closeBig 那次是同一個形狀：測了東西在不在，沒測它會不會動。 */
+try{ loadMarket(); }catch(e){ console.error('loadMarket failed at boot:', e); }
 /* 網路回來、或分頁重新回到前景時，立刻試一次重連（不等退避計時器） */
 window.addEventListener('online', ()=>{ if(state.token && !state.live && !state._loggedOut){ cancelReconnect(); silentReverify(); } });
 window.addEventListener('offline', ()=>{ if(state.live) degradeConnection(new ApiError('這台裝置目前沒有網路連線','offline','網路恢復後會自動重連。')); });
