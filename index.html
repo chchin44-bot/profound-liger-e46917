@@ -3651,13 +3651,6 @@ function buildWatchMoves(p, t){
   return moves;
 }
 
-const TONE = {
-  green:{ box:'border-emerald-500/40 bg-emerald-500/10', txt:'text-emerald-200', head:'text-emerald-300' },
-  amber:{ box:'border-amber-500/40 bg-amber-500/10',     txt:'text-amber-200',   head:'text-amber-300' },
-  red:  { box:'border-rose-500/40 bg-rose-500/10',       txt:'text-rose-200',    head:'text-rose-300' },
-  slate:{ box:'border-slate-600/40 bg-slate-800/40',     txt:'text-slate-300',   head:'text-slate-200' }
-};
-
 function priceLadder(d){
   const t = d.targets || {}, p = d.price;
   const pts = [
@@ -4019,7 +4012,13 @@ function renderTable(){
 
 /* ══════════════════════════════════════════════════════════════
    7-B. 三維度目標價 · 動態調倉引擎
-
+   ══════════════════════════════════════════════════════════════
+   v57 復原時，這個註解區塊的結尾被切掉了，於是它一路吃到下一個結束標記為止——
+   const TONE、function closeBig、function closeAllModals 三個宣告
+   全部被吃進註解裡，畫面上的結果是「目標價彈窗的『關閉』按鈕按了沒反應」。
+   node --check 通過（語法完全合法）、15 條不變量通過、100 組隨機情境通過，
+   因為**沒有任何一個測試按過「關閉」**。使用者一開就撞到。
+   ══════════════════════════════════════════════════════════════ */
 
 const TONE = {
   green:{ box:'border-emerald-500/40 bg-emerald-500/10', txt:'text-emerald-200', head:'text-emerald-300' },
