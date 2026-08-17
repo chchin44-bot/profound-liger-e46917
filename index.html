@@ -1497,12 +1497,22 @@ function updateMockButton(){
   b.className = 'h-11 px-3 rounded-lg text-sm transition whitespace-nowrap '
     + (state.demoMode ? 'bg-amber-600/70 hover:bg-amber-500 text-white' : 'bg-slate-700/70 hover:bg-slate-600 text-slate-200');
 }
+/* v66：收盤時直接在按鈕上講清楚。
+   使用者按了一個註定拿不到東西的按鈕，然後得到一個看起來像錯誤的彈窗——
+   那個挫折是我們造成的，不是 FinMind。按鈕自己就該說得出「現在按了也沒有」。 */
 function updateRtButton(){
   const b = $('rtBtn'); if(!b) return;
-  b.textContent = rtUnavailable ? '⚡ 即時報價（需 sponsor）' : '更新即時報價';
-  b.title = rtUnavailable
-    ? 'FinMind 的即時報價端點只開放 sponsor 會員。點我看說明。'
-    : '把自選清單的價格換成最後一筆成交（均線與布林仍為前一交易日）';
+  const ses = marketSession();
+  if(rtUnavailable){
+    b.textContent = '⚡ 即時報價（需 sponsor）';
+    b.title = 'FinMind 的即時報價端點只開放 sponsor 會員。點我看說明。';
+  } else if(!ses.open){
+    b.textContent = `更新即時報價（${ses.label}）`;
+    b.title = `${ses.detail}即時報價是盤中才有的東西，現在按了會回「成功但沒有內容」。`;
+  } else {
+    b.textContent = '更新即時報價';
+    b.title = '把自選清單的價格換成最後一筆成交（均線與布林仍為前一交易日）';
+  }
 }
 /* 黃色警語：標題那一句永遠看得見，其餘收起來。
    標題本身就是完整的一句操作性警告，收起來之後畫面上仍然讀得到「這不是該買賣的價格」。 */
@@ -1554,6 +1564,32 @@ function rtTraceVerdict(e){
      ・<code class="bg-slate-900 px-1 rounded">Authorization</code> 標頭觸發 preflight，而對方沒有回應 preflight<br>
      ・請求根本沒出去（防火牆、擴充套件、公司網路）<br>
      <strong>所以這一頁不會告訴你是哪一個。</strong>下面那個 30 秒的自我測試可以分出來。`);
+}
+/* 200 + success + 空資料。這不是錯誤，講成錯誤才是錯的。 */
+function showRtEmptyModal(e){
+  const ses = (e && e.session) || marketSession();
+  showModal({ icon:'', title: e.message,
+    body:`<div class="text-[15px] leading-relaxed">
+      <div class="rounded-lg bg-emerald-500/10 border border-emerald-500/40 text-emerald-200 p-3 mb-3">
+        <div class="font-bold mb-1">這一次其實是成功的</div>
+        FinMind 回了 <code class="bg-slate-900 px-1 rounded">HTTP 200</code>、狀態 <code class="bg-slate-900 px-1 rounded">success</code>。
+        <strong>你的 Token、會員資格、網路、程式的呼叫方式，全部都沒有問題。</strong>
+      </div>
+      <div class="rounded-lg bg-slate-800/60 border border-slate-700 p-3 mb-3">
+        <div class="text-slate-300 font-bold mb-1">那為什麼沒有數字</div>
+        ${safeText(e.detail || '', 400)}
+      </div>
+      <div class="rounded-lg bg-slate-800/60 border border-slate-700 p-3 mb-3 text-[14px]">
+        <div class="text-slate-300 font-bold mb-1">程式試了什麼（跑完之後填的）</div>
+        ${rtTraceTable(e)}
+      </div>
+      <div class="rounded-lg bg-slate-800/60 border border-slate-700 p-3 text-[14px] leading-relaxed">
+        <div class="text-slate-300 font-bold mb-1">實際影響：沒有</div>
+        本頁的位階、目標價與所有判定<strong>本來就是用收盤價算的</strong>。
+        即時報價只是把價格換成盤中最後一筆成交，收盤後那個數字本來也等於收盤價。
+      </div>
+    </div>`,
+    actions:`<button class="btn btn-primary" onclick="closeModal()">了解</button>` });
 }
 function showSponsorModal(e){
   /* v62：整個改寫。舊版斷言「你是免費帳號、需要 sponsor」——
@@ -2720,7 +2756,7 @@ function secsToNextHour(){
 /* 額度用盡 / Token 失效 / 被攔截 —— 連線狀態必須降級，不能繼續顯示綠燈 */
 function degradeConnection(e){
   /* 端點權限問題（例如即時報價需要 sponsor）不影響主要連線，不得把 state.live 拆掉 */
-  if(e && (e.kind === 'sponsor' || e.kind === 'rtunknown' || e.kind === 'endpoint')) return;
+  if(e && (e.kind === 'sponsor' || e.kind === 'rtunknown' || e.kind === 'rtempty' || e.kind === 'endpoint')) return;
   const kind = e && e.kind;
 
   if(kind === 'quota'){
@@ -2841,15 +2877,26 @@ async function fetchSnapshot(ids){
      preflight OPTIONS。如果 FinMind 沒有對這個端點回應 preflight，帶標頭的請求會在
      瀏覽器層直接失敗（Failed to fetch），而不帶標頭的簡單請求反而可能通。
      兩種都試，並且**記錄下實際是哪一種成功的**，不要再用猜的。 */
-  const idParam = list.length ? { data_id: list.join(',') } : {};
+  /* v66：實機量到的結果（2026-08-17 16:21，使用者手機）——
+       專屬端點 + Authorization 標頭   → TypeError: Load failed
+       專屬端點 + ?token=              → **HTTP 200，success**（只是沒有資料）
+       /data?dataset= + 兩種           → TypeError: Load failed
+     所以：
+     ① 會通的只有「專屬端點 + ?token=」。Authorization 是自訂標頭會觸發 preflight，
+        FinMind 沒有回應 preflight，於是在瀏覽器層就死了——那一版把它排在第一個試，
+        等於每次都先撞牆兩次。會通的那個要排第一。
+     ② data_id 一律只送一檔，跟官方文件的範例完全一樣（parameter = {"data_id": "2330"}）。
+        舊版把多檔用逗號串起來送，那個形式官方沒有寫過，不能拿使用者的額度去賭。
+        多檔時改成不送 data_id（官方說 data_id 可留空＝全部），回來自己篩。 */
+  const idParam = (list.length === 1) ? { data_id: list[0] } : {};
   const hdr = state.token ? { Authorization: 'Bearer ' + state.token } : null;
   const attempts = [
-    { url: buildUrlFor(EP.snapshot, idParam, false), headers: hdr, how: '專屬端點 + Authorization 標頭' },
     { url: buildUrlFor(EP.snapshot, idParam),        headers: null, how: '專屬端點 + ?token=' },
-    { url: buildUrlFor(EP.data, Object.assign({ dataset:'taiwan_stock_tick_snapshot' }, idParam), false),
-      headers: hdr, how: '/data?dataset= + Authorization 標頭' },
     { url: buildUrlFor(EP.data, Object.assign({ dataset:'taiwan_stock_tick_snapshot' }, idParam)),
-      headers: null, how: '/data?dataset= + ?token=' }
+      headers: null, how: '/data?dataset= + ?token=' },
+    { url: buildUrlFor(EP.snapshot, idParam, false), headers: hdr, how: '專屬端點 + Authorization 標頭' },
+    { url: buildUrlFor(EP.data, Object.assign({ dataset:'taiwan_stock_tick_snapshot' }, idParam), false),
+      headers: hdr, how: '/data?dataset= + Authorization 標頭' }
   ].filter(a => a.headers !== null || !hdr || !a.how.includes('標頭'));
   /* v65：每一種呼叫形式**實際**發生了什麼，一律記下來。
      上一版的彈窗直接寫死一句「四種都回 Failed to fetch」——那是我猜的，不是量到的。
@@ -2886,7 +2933,18 @@ async function fetchSnapshot(ids){
     const r = Array.isArray(j.data) ? j.data : (Array.isArray(j) ? j : []);
     if(!r.length){
       note(a.how, 'HTTP 200，但沒有資料' + (j.msg ? '（' + String(j.msg).slice(0,200) + '）' : ''));
-      lastErr = new ApiError('即時報價回傳空資料','api', j.msg ? String(j.msg) : ''); continue;
+      /* 200 + success + 空資料，代表**請求完全正確**，只是那個時點沒有即時資料。
+         最常見的原因就是現在不是交易時間——即時報價是盤中的東西。
+         這種情況再去試其他呼叫形式沒有意義，而且會白白吃掉額度：直接停下來講清楚。 */
+      const ses = marketSession();
+      const er = new ApiError(
+        ses.open ? '即時報價回了「成功」，但沒有任何內容' : `現在${ses.label}，沒有即時報價`,
+        'rtempty',
+        ses.open
+          ? 'FinMind 回應 HTTP 200、狀態 success，但資料是空的。請求本身是對的（Token、連線、呼叫方式都沒問題），是那一頭這個時點沒有內容。'
+          : `${ses.detail}即時報價是盤中才有的東西，收盤後 FinMind 會回「成功」但內容是空的——所以這不是錯誤，也不是你的 Token 或會員資格有問題。`);
+      er.trace = trace; er.session = ses;
+      throw er;
     }
     note(a.how, 'HTTP 200，取得 ' + r.length + ' 筆 ✓');
     rows = r; usedHow = a.how; break;
@@ -3494,7 +3552,8 @@ async function refreshRealtime(){
       if(isFatal(e)) throw e;
       // 批次失敗 → 逐檔重試（可能是端點不支援多檔）
       // 端點權限問題逐檔重試也一定失敗，只是白白多打幾次請求
-      if(e && (e.kind === 'sponsor' || e.kind === 'rtunknown' || e.kind === 'endpoint')) throw e;
+      /* rtempty 代表請求完全正確、只是那個時點沒內容（多半是收盤）。逐檔重試只會白花額度。 */
+      if(e && (e.kind === 'sponsor' || e.kind === 'rtunknown' || e.kind === 'rtempty' || e.kind === 'endpoint')) throw e;
       toast('批次即時報價失敗（' + e.message + '），改為逐檔嘗試…','warn');
       for(const s2 of items){
         try{ const r = await fetchSnapshot(s2.id); Object.assign(map, r.map); }
@@ -3532,7 +3591,8 @@ async function refreshRealtime(){
       n?'ok':'warn');
   }catch(e){
     degradeConnection(e);
-    if(e && (e.kind === 'sponsor' || e.kind === 'rtunknown')){ rtUnavailable = true; showSponsorModal(e); }
+    if(e && e.kind === 'rtempty'){ showRtEmptyModal(e); }
+    else if(e && (e.kind === 'sponsor' || e.kind === 'rtunknown')){ rtUnavailable = true; showSponsorModal(e); }
     else toast('即時報價失敗：' + e.message, 'err');
   }finally{
     setFetchButtons(true); updateRtButton();
