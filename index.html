@@ -125,7 +125,58 @@
      再用 margin-left:auto 把方塊推到數字底下：句子本身仍然靠左讀，但位置跟著數字走。 */
   /* 上限擋住「撐開整欄」，下限擋住「擠成七行細長條」——
      本益比欄天生只放一個數字，很窄，不給下限的話換行之後會變成一條瘦長的字串。 */
+  /* ══ v85：對比度 ══
+     實測這個底色（#08141f）上：
+       text-slate-500 #64748b → 3.90:1  ← 未達 WCAG AA 的 4.5
+       text-slate-400 #94a3b8 → 7.25:1  ← 通過 AAA
+     全站 46 處 text-slate-500 幾乎都是「說明句」與「表頭」——
+     正好是老花眼最需要看清楚的部分。而 78 歲的對比敏感度下降，
+     實務上該用 7:1（AAA）而不是 4.5:1。
+     這裡統一覆蓋，而不是去改 46 個地方——那一定會漏掉幾個。 */
+  .text-slate-500{ color:#93a5c0 !important; }          /* 7.42:1 */
+  .text-slate-600{ color:#8b9db8 !important; }          /* 版本戳記等純資訊，仍拉到 6.7:1 */
+  .text-slate-400{ color:#9fb0c7 !important; }          /* 6.96 → 7.9：說明句是主要內容，不是裝飾 */
+  /* /70 這類半透明色階在深色底上會掉到 5.x。賺賠百分比是使用者第二常看的數字。 */
+  .text-rose-300\/70{ color:#fda4b4 !important; }
+  .text-emerald-300\/70{ color:#6ee7b0 !important; }
+  .text-emerald-300\/90, .text-amber-300\/90, .text-slate-300\/90{ opacity:1 !important; }
+  /* 目標價卡片上的金額（$1,200.0）是彩色小字，落在 5.2:1。它是這一頁最常被讀的數字之一。 */
+  .text-emerald-200{ color:#a7f3d0 !important; }
+  .text-cyan-300{ color:#7dd8f0 !important; }
+  .text-sky-300{ color:#8fd0f7 !important; }
+  .text-fuchsia-300{ color:#f3a8e8 !important; }
+  .text-amber-300{ color:#fcd66b !important; }
+  .text-orange-300{ color:#fdb373 !important; }
+  /* 「還在存錢／已經退休」兩顆選擇鈕的副標：只提高不透明度，
+     不要改顏色——選中那顆是淺底，改成淺灰反而更看不到（第一版就踩到）。 */
+  .swan-mode span{ opacity:1 !important; }
+  .af-tip{ color:#93a5c0 !important; }                  /* 欄位下方的提示：4.24 → 7.42 */
+  /* opacity 會把顏色往背景拉：opacity-70 的 11px 說明字只有 4.05:1。
+     這些是「選項的副標」，不是裝飾，該讀得到。 */
+  .swan-mode .opacity-70, .opacity-70{ opacity:.88 !important; }
+  /* 賺賠的紅／綠在深色底上只有 6.63:1。顏色是台股慣例不能換，
+     但可以把色階調亮一階，維持紅＝賺、綠＝賠。 */
+  .text-rose-400{ color:#fb8098 !important; }
+  .text-emerald-400{ color:#4ade9b !important; }
+  .text-emerald-400\/80{ color:#6ee7b0 !important; }   /* 「以上統計全部基於…」那一句 */
+  .text-rose-300{ color:#fda4b4 !important; }
+  .text-emerald-300{ color:#6ee7b0 !important; }
+  /* 收合狀態的百分比：opacity .75 會把 7.25 拉回 5.x，改用實色 */
+  #wlBody td:nth-child(4) .pnl-pct{ opacity:1 !important; }
+  /* 分頁鈕停用時 opacity-40 只有 3.33:1，看不出那是「已停用」還是「壞掉」 */
+  .pager-btn.opacity-40, .opacity-40.pointer-events-none{ opacity:.62 !important; }
+
   .pe-note{ max-width:230px; min-width:180px; margin-left:auto; }
+  /* v85：桌機 1280 ＋ 字級「大」時，表格 scrollWidth 1322 > clientWidth 1212，
+     右邊 110px 被切掉，「操作」整欄看不到——而且頁面層級沒有橫向捲軸，
+     畫面上沒有任何線索告訴使用者右邊還有東西。
+     字級放大時把幾個純敘述欄位縮回去，讓數字與操作留在畫面內。 */
+  html[data-fs="big"] .pe-note, html[data-fs="mid"] .pe-note{ max-width:200px; min-width:150px; }
+  html[data-fs="big"] table.fin td, html[data-fs="big"] table.fin th{ padding-left:.4rem; padding-right:.4rem; }
+  html[data-fs="mid"] table.fin td, html[data-fs="mid"] table.fin th{ padding-left:.5rem; padding-right:.5rem; }
+  /* 真的還是塞不下時，至少讓使用者知道可以往右滑 */
+  .scroll-hint{ display:none; }
+  .can-scroll-x .scroll-hint{ display:block; }
 
   /* v84：標的欄的第二行原本是「名稱 · 成本 600.82 · 30 股（零股）」擠成一行，
      而儲存格是 nowrap，於是它只能一路橫著長出去。
@@ -135,6 +186,14 @@
   /* 不用 .nb —— 那個類別是 inline-block，而且宣告在這之後，會把 block 蓋掉。
      這三行各自要 nowrap（「成本 600.82」不該斷在中間），但必須是 block。 */
   .c-name, .c-cost, .c-shares{ display:block; white-space:nowrap; }
+  /* 字級放大之後，一行硬塞兩欄一定會撞。改成上下排，右欄靠左對齊接在下面。 */
+  @media (max-width: 480px){
+    html[data-fs="big"] .pnl-row, html[data-fs="mid"] .pnl-row{ display:block !important; }
+    html[data-fs="big"] .pnl-row > div:last-child,
+    html[data-fs="mid"] .pnl-row > div:last-child{ text-align:left !important; margin-top:6px; }
+    html[data-fs="big"] .pnl-row > div:first-child,
+    html[data-fs="mid"] .pnl-row > div:first-child{ min-width:0; }
+  }
   .c-cost{ margin-top:1px; }
   @media (max-width: 820px){
     /* 手機是卡片式版面，沒有「欄」可以對齊，維持整行寬度比較好讀 */
@@ -709,7 +768,7 @@
            起因是很實際的一件事：改好的東西部署上去之前，畫面上完全看不出手上這份是哪一版，
            使用者以為沒改、我以為改了，兩邊各講各的。這一行由 build.sh 在建置時填入，
            不可能寫錯，也不會忘了更新。 -->
-      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v85 · 2026-08-18 17:19</span>
+      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v87 · 2026-08-18 19:42</span>
     </div>
 
     <!-- 設定：預設收合。裡面是 Token、登出、診斷、隱私、說明、示範資料、資料儲存、進階設定。 -->
@@ -934,7 +993,7 @@
       <p id="addMsg" class="text-[11px] mt-2 text-slate-400"></p>
     </div>
 
-    <div class="overflow-x-auto rounded-xl border border-slate-700/40">
+    <div class="tblwrap overflow-x-auto rounded-xl border border-slate-700/40">
       <table class="fin w-full text-xs">
         <thead class="bg-slate-900/80 text-slate-400">
           <tr class="text-left">
@@ -1038,7 +1097,7 @@
 
     <div id="filterNotice" class="hidden mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-200 text-[13px] leading-relaxed p-2.5"></div>
 
-    <div class="overflow-x-auto rounded-xl border border-slate-700/40">
+    <div class="tblwrap overflow-x-auto rounded-xl border border-slate-700/40">
       <table class="fin w-full text-xs">
         <thead class="bg-slate-900/80 text-slate-400">
           <tr class="text-left">
@@ -1513,7 +1572,15 @@ function txnFee(amount){ return amount > 0 ? Math.max(TXN_FEE_MIN, Math.round(am
    刻意**不寫進 s.txns**：每次即時推導，資料重抓時自動跟上，也不會把
    幾十筆自動紀錄塞進使用者的備份檔。使用者刪掉的用 s.txnHide 記 id。 */
 function autoTxns(s){
-  const d = s.data || {}, today = todayISO();
+  const d = s.data || {};
+  /* v87：舊版閘門是 `e.date > today`，但 adjustSeries 的閘門是「收盤價序列的最後一天」。
+     兩套「今天」不一致時（除息當天收盤價還沒公布、或快取的價格過期——STALE_MAX 允許到 30 天），
+     divCash 立刻加一整筆，而市值還在用**除息前**的價格：那筆股利被算了兩次。
+     實測序列到 08-16、除息 08-17 每股 4.5、2000 股：溢報 9,000 元，正好是一整筆。
+     每一檔配息股在除息當天收盤前都會發生。
+     閘門改成「以收盤價序列的最後一天為準」，跟 adjustSeries 用同一把尺。 */
+  const lastPx = (Array.isArray(d.series) && d.series.length) ? d.series[d.series.length-1].date : null;
+  const today = lastPx && lastPx < todayISO() ? lastPx : todayISO();
   const hide = new Set(s.txnHide || []);
   const out = [];
   for(const e of (Array.isArray(d.corpEvents) ? d.corpEvents : [])){
@@ -1544,17 +1611,47 @@ function autoTxns(s){
          15 元退 3 元高估 25%、12 元退 5 元高估 71%；而股價低於 10 元時 k>1 會被
          `k<1` 整筆濾掉（減資直接消失，高估 17.6%~42.9%）。全程 problems 0 筆。
          現金減資有封閉解：r = (before − after) / (10 − after)，退還股款 = 10r。 */
-      const isCash = /現金|退還|返還/.test(String(e.reason||''));
+      /* v87：這裡的 10 是面額，而它被寫死了——同一份程式在 sharesOutstanding() 花了一整節
+         去**推算**面額（因為 2014 年起台灣開放彈性面額，KY 股與創新板有 5／1／0.1 元的）。
+         帳本這一份沒跟上：面額 5 元的股票實測換股比例算成 0.774（真值 0.8）、
+         每股退還算成 2.2581 元（真值 1.00），股數低估 3.23%，畫面還會印出 774.19 股這種
+         不可能存在的數字。改成用推算出來的面額；推不出來才退回 10，而且標明是假設。 */
+      let isCash = /現金|退還|返還/.test(String(e.reason||''));
+      const parInfo = sharesOutstanding(d);
+      const par = (parInfo && !parInfo.blocked && parInfo.par > 0) ? parInfo.par : PAR_ASSUMED;
+      const parGuessed = !(parInfo && !parInfo.blocked && parInfo.par > 0);
+      /* v87：只靠 reason 的關鍵字判斷是不夠的——FinMind 的事由欄常常只寫「減資」。
+         判錯時走 k = before/after，而現金減資的 after > before 同樣滿足 k < 1，
+         於是**通過所有守門、不進 problems**，退還的股款整筆蒸發（實測 2,000 元）。
+
+         我第一版想用「哪一條公式解得出合理的 r」來分辨，跑完測試才發現那是錯的：
+           彌補虧損  after = before / (1−r)
+           現金減資  after = (before − 面額×r) / (1−r)
+         給定 (before, after)，**兩條式子都解得出一個合理的 r**——
+         實測 before 40 → after 50 被我的判別式當成「現金減資、每股退還 2.5 元」，
+         但那其實是單純的彌補虧損。這兩種在數學上分不開，事由欄是唯一的線索。
+
+         所以不猜：沒有關鍵字時維持舊行為（當成彌補虧損、股數照 before/after 調整），
+         但**明白告訴使用者這裡有歧義**，請他去對券商對帳單。
+         這份程式的原則是「解不出來就明說解不出來」，不是挑一個看起來合理的答案。 */
+      /* 事由明寫「彌補虧損」就不是歧義——只有完全沒有線索時才算。 */
+      const lossStated = /彌補|虧損|減少資本以彌補/.test(String(e.reason||''));
+      const ambiguous = !isCash && !lossStated && e.after > e.before;
       let k = e.before / e.after, back = 0, solved = true;
       if(isCash){
-        const denom = 10 - e.after;
+        const denom = par - e.after;
         const r = denom !== 0 ? (e.before - e.after) / denom : NaN;
-        if(isFinite(r) && r > 0 && r < 1){ k = 1 - r; back = +(10 * r).toFixed(4); }
+        if(isFinite(r) && r > 0 && r < 1){ k = 1 - r; back = +(par * r).toFixed(4); }
         else solved = false;
       }
       if(solved && k > 0.05 && k < 1){
         out.push({ id, date:e.date, kind:'reduce', ratio:k, shares:0, price:back, auto:true,
-                   note: (isCash ? `現金減資，每股退還約 ${back} 元` : '彌補虧損減資') + (e.reason ? `（${String(e.reason).slice(0,20)}）` : '') });
+                   ambiguous,
+                   note: (isCash ? `現金減資，每股退還約 ${back} 元（面額以 ${par} 元計${parGuessed?'，這是假設值':''}）`
+                                 : (ambiguous
+                                    ? '減資（官方事由沒寫是哪一種，本頁先當成彌補虧損處理——若你當時有收到退還的現金，請自己補一筆）'
+                                    : '彌補虧損減資'))
+                       + (e.reason ? `（${String(e.reason).slice(0,20)}）` : '') });
       }else{
         /* 解不出來就明說解不出來，不要靜靜略過一次會改變股數的事件。 */
         out.push({ id, date:e.date, kind:'mixed', shares:0, price:0, auto:true, amt:null,
@@ -1572,8 +1669,23 @@ const TXN_ORDER = { reduce:0, stkdiv:1, div:2, mixed:3, buy:4, sell:5 };
    刻意**不把它寫進 t.date**：舊作法會把它變成一個看起來像真的日期，
    存檔往返一次之後 dateUnknown 就消失了，畫面從「買進日期不詳」
    變成「2026-08-17 買進」——那是把「我不知道」寫成「我知道」的第 N 次重演。 */
-const TXN_FAR = '9999-12-31';
-function txnKey(t){ return (t.dateUnknown || !t.date) ? TXN_FAR : String(t.date).slice(0,10); }
+/* v87：舊版把「日期不詳」排到最後（9999-12-31），本意是「不套用任何除權息」。
+   但那也把它排到**賣出後面**，於是賣出跑到時手上是 0 股，
+   `sellN = Math.min(n, shares)` 得 0 → continue，整筆賣出被吞掉：
+   股數與市值變成兩倍、已實現與稅費全部歸零，而首屏一句警告都沒有
+   （唯一那句還說「金額可能因此偏低」，方向剛好相反）。
+   實測買 1,000 股（日期不詳）＋賣 500 股：手上印 1,000 股、市值 100 萬，真值 500 股／50 萬。
+   而「我不記得是哪一天」正是這個 app 在表單上主推的選項。
+
+   改法：日期不詳的**買進**排到最前面（'0000-00-00'），日期不詳的**賣出**仍排到最後。
+   理由：買進要先存在，後面的賣出才減得動；而「不套用除權息」這個原意靠的是
+   autoTxns 的事件都有真實日期、排序上仍然在它之後——買進排最前反而更貼近
+   「我很久以前就買了、只是不記得哪一天」的真實情況。 */
+const TXN_FAR = '9999-12-31', TXN_FIRST = '0000-00-00';
+function txnKey(t){
+  if(!(t.dateUnknown || !t.date)) return String(t.date).slice(0,10);
+  return t.kind === 'buy' ? TXN_FIRST : TXN_FAR;
+}
 function allTxns(s){
   return (s.txns || []).concat(autoTxns(s))
     .filter(t => t && (t.date || t.dateUnknown))
@@ -1587,16 +1699,26 @@ function positionOf(s){
   const list = allTxns(s);
   let shares = 0, cost = 0, realized = 0, divCash = 0, feePaid = 0, taxPaid = 0;
   const problems = [];
-  let firstBuy = null, unresolved = 0;
+  let firstBuy = null, unresolved = 0, unknownBuy = false;
 
   for(const t of list){
     const n = Math.max(0, +t.shares || 0);
     const p = +t.price || 0;
 
+    /* v87：日期不詳的買進現在排在最前面（否則後面的賣出會被整筆吞掉）。
+       但那也代表官方的除權息／減資事件會全部套到它頭上——
+       使用者只說「我不記得哪一天買的」，不代表他五年前就持有，
+       把五年份股利都算給他會高估好幾倍（先前量過 5.0 倍）。
+       所以：只要帳本裡有日期不詳的買進，就**不套用任何自動推導的公司行為**，
+       維持舊版的保守立場；畫面上本來就有「買進日期不詳，所以沒有算任何除權息」那句話。
+       手動補的紀錄（非 auto）不受影響——那是使用者自己確認過的。 */
+    if(t.auto && unknownBuy) continue;
     if(t.kind === 'buy'){
       if(!(n > 0) || !(p > 0)){ problems.push({ date:t.date, msg:'買進紀錄的股數或價格不是正數，這一筆沒有算進去' }); continue; }
       const amt = n * p, f = (t.fee != null ? +t.fee : txnFee(amt));
+      t._usedShares = n;
       shares += n; cost += amt + f; feePaid += f;
+      if(t.dateUnknown || !t.date) unknownBuy = true;
       if(!firstBuy && !t.dateUnknown && t.date) firstBuy = t.date;
 
     }else if(t.kind === 'sell'){
@@ -1604,7 +1726,10 @@ function positionOf(s){
       if(n > shares + 1e-6)
         problems.push({ date:t.date, msg:`這天賣出 ${Math.round(n).toLocaleString('zh-TW')} 股，但照前面的紀錄當時手上只有 ${Math.round(shares).toLocaleString('zh-TW')} 股。是不是漏記了一筆買進？` });
       const sellN = Math.min(n, shares);
-      if(sellN <= 0) continue;
+      /* 把帳本實際採用的股數標回這一筆紀錄，讓畫面不必自己重算一次
+         （重算就會出現第二份實作，而它一定會跟這裡不一致——實測差 398,230 元）。 */
+      t._usedShares = sellN;
+      if(sellN <= 0){ t._usedShares = 0; continue; }
       const avg = shares > 0 ? cost / shares : 0;
       const amt = sellN * p;
       const f = (t.fee != null ? +t.fee : txnFee(amt));
@@ -1622,11 +1747,24 @@ function positionOf(s){
       if(add > 0) shares += add;
 
     }else if(t.kind === 'reduce'){
+      if(t.ambiguous)
+        problems.push({ date:t.date, msg:`${t.date} 這天減資，但官方資料沒寫是「彌補虧損」還是「現金減資」。`
+          + `本頁先當成彌補虧損（股數減少、不退錢）處理。`
+          + `如果你當時有收到一筆退還的現金，請按「加一筆」自己補上，否則帳面會少算那筆錢。` });
       /* 減資：股數等比例減少。p = 每股退還股款（彌補虧損減資為 0）。
          退還的現金直接扣減成本總額，這是台灣券商的作法。 */
       const before = shares;
       const after = (t.ratio > 0 && t.ratio < 1) ? shares * t.ratio : Math.max(0, shares - n);
-      if(p > 0) cost -= before * p;
+      if(p > 0){
+        const back = before * p;                 // 實際收到的現金
+        /* v85：舊版做 cost -= back，然後在下面把負數 clamp 成 0——
+           退還股款超過剩餘成本時，那筆差額就人間蒸發了。
+           實測 1000 股@1（成本 1,020）現金減資每股退 5 元：收到 5,000 元，
+           帳本卻是 realized 0、divCash 0，3,980 元不見。
+           正確作法跟賣出一樣：超過成本的部分是**已實現損益**，不是消失。 */
+        if(back <= cost){ cost -= back; }
+        else { realized += back - cost; cost = 0; }
+      }
       shares = after;
       if(cost < 0) cost = 0;
 
@@ -1647,7 +1785,7 @@ function positionOf(s){
   }
   const avgCost = shares > 0 ? cost / shares : 0;
   return { shares, cost, avgCost, realized, divCash, feePaid, taxPaid,
-           problems, unresolved, firstBuy, n:list.length, txns:list };
+           problems, unresolved, firstBuy, unknownBuy, n:list.length, txns:list };
 }
 
 /* 匯入的每一筆交易紀錄都要過這裡。備份檔是純文字 JSON，使用者會手打，
@@ -1655,6 +1793,10 @@ function positionOf(s){
    但不接受 NaN／Infinity／負數），kind 走白名單，日期走格式檢查。
    回傳乾淨的物件；不合格回傳 null（呼叫端會濾掉）。 */
 const TXN_KINDS_OK = new Set(['buy','sell','div','stkdiv','reduce']);
+/* 單筆紀錄的數值上限。輸入端與還原端**共用同一組**——
+   兩邊各寫一份的下場就是「存得進去、讀不回來」，而且中間沒有任何提示。 */
+const TXN_MAX_SHARES = 5e7, TXN_MAX_PRICE = 1e5;
+function numOK(v){ return typeof v === 'number' && isFinite(v) && v >= 0; }
 function sanitizeTxn(t){
   if(!t || typeof t !== 'object') return null;
   if(!TXN_KINDS_OK.has(t.kind)) return null;
@@ -1674,9 +1816,13 @@ function sanitizeTxn(t){
   if(t.ratio != null){ const r = num(t.ratio); if(r > 0.05 && r < 20) o.ratio = r; }
   if(t.fee  != null){ const f = num(t.fee);  if(f != null && f <= 1e7) o.fee = f; }
   if(t.tax  != null){ const x = num(t.tax);  if(x != null && x <= 1e7) o.tax = x; }
-  /* 單筆股數與價格也要有上限：台股單筆委託上限 499 張，價格上限以最高價股保守取 10 萬。 */
-  if(o.shares > 5e7) return null;
-  if(o.price  > 1e5) return null;
+  /* 單筆股數與價格也要有上限：台股單筆委託上限 499 張，價格上限以最高價股保守取 10 萬。
+     v87：這兩條上限**只存在於還原端**，輸入端完全沒有——
+     使用者把「總投入 50 萬」填進「每股多少錢」，畫面回報「✅ 已加入 · 已自動儲存」，
+     重新整理之後整筆消失，而右上角還寫著「已自動儲存 11:21」。
+     現在上限收斂成常數 TXN_MAX_PRICE／TXN_MAX_SHARES，輸入端會先擋。 */
+  if(o.shares > TXN_MAX_SHARES) return null;
+  if(o.price  > TXN_MAX_PRICE) return null;
   if(typeof t.note === 'string') o.note = t.note.slice(0,80);
   if((o.kind === 'buy' || o.kind === 'sell') && !(o.shares > 0 && o.price > 0)) return null;
   return o;
@@ -1786,7 +1932,10 @@ function srcBadge(d){
     return `<span class="tag border bg-sky-500/15 text-sky-200 border-sky-500/40" title="這個價格是你自己填的，不是 FinMind 抓回來的。填寫日期 ${esc(d.asOf||'')}。">你自己填的 ${esc(String(d.asOf||'').slice(5))}</span>`;
   }
   if(d.src === 'live'){
-    return `<span class="tag border bg-emerald-500/15 text-emerald-300 border-emerald-500/40" title="FinMind 真實數據，資料截止 ${esc(d.asOf||'（未知）')}${d.fetchedAt?'，抓取於台北時間 '+twHM(d.fetchedAt):''}">真實${d.asOf?' '+esc(String(d.asOf).slice(5)):''}</span>`;
+    /* v87：「抓取於」以前一律寫成現在，即使整批資料都來自快取。
+       API 掛掉時最明顯：一個新鮮的時間戳背書一批最多 30 分鐘前的數字。
+       現在快取來的會標明，時間也是快取真正寫入的那一刻。 */
+    return `<span class="tag border bg-emerald-500/15 text-emerald-300 border-emerald-500/40" title="FinMind 真實數據，資料截止 ${esc(d.asOf||'（未知）')}${d.fetchedAt?'，'+(d.fromCache?'這批數字是台北時間 '+twHM(d.fetchedAt)+' 抓的，本次沒有重新向 FinMind 確認':'抓取於台北時間 '+twHM(d.fetchedAt)):''}">真實${d.asOf?' '+esc(String(d.asOf).slice(5)):''}${d.fromCache?' ·快取':''}</span>`;
   }
   if(d.src === 'rt'){
     const clk = rtClock(d.rtTime);
@@ -2284,6 +2433,9 @@ const REQ_TTL = {
 const reqCache = new Map();       // key → { at, data }
 const reqInflight = new Map();    // key → Promise
 let reqSaved = 0;                 // 這個工作階段省下的請求數
+/* 最近一次 finmind() 是不是靠快取回答的（回傳快取的寫入時間）；
+   null 代表真的送出了請求。applyStockData 用它決定 fetchedAt 要不要往前推。 */
+let lastFetchCacheAt = null;
 /* 舊版的 key 只有 dataset + params，不含 Token 也不含代理。
    後果是全站最嚴重的一種謊：使用者把 Token 打錯，verifyToken 送出的那個請求
    命中前一個 Token 留下的快取 → 「✅ 連線成功」＋ 綠色徽章 ＋ 零個網路封包，
@@ -2308,10 +2460,17 @@ async function finmind(dataset, params={}, opts){
   const ttl = REQ_TTL[dataset] || 0;
   if(ttl){
     const hit = reqCache.get(key);
-    if(hit && (Date.now() - hit.at) < ttl){ reqSaved++; return hit.data; }
+    /* v87：快取命中會讓「這一輪到底有沒有真的連上 FinMind」變得無法判斷。
+       實測 API 全掛（每個請求都 500）之後按「重新整理本頁」：
+       只有 1 個請求真的發出去（而且失敗），畫面卻說「更新完成：1 檔取得真實數據」、
+       徽章維持綠燈，而個股標籤的「抓取於 19:19」是**那一刻沒有任何資料成功抓回來**的時間。
+       這個時間戳最多可以比真相晚 30 分鐘（股價）／12 小時（財報）。
+       記下「這次是不是吃快取」，讓上層可以誠實標示資料的年紀。 */
+    if(hit && (Date.now() - hit.at) < ttl){ reqSaved++; lastFetchCacheAt = hit.at; return hit.data; }
     const inf = reqInflight.get(key);
     if(inf){ reqSaved++; return inf; }
   }
+  lastFetchCacheAt = null;                        // 真的要出門了
   const pr = finmindRaw(dataset, params);
   if(ttl){
     if(reqCache.size > 400){                       // 免費額度一小時 600 次，400 筆已遠超過實際需要
@@ -2662,7 +2821,7 @@ function adjustSeries(series, events){
   if(!Array.isArray(series) || !series.length) return { series, adjusted:false, n:0, dropped:0 };
   const lo = series[0].date, hi = series[series.length-1].date;
   let dropped = 0;
-  const seen = new Set();
+  const seen = new Map();
   const evs = (events||[])
     .filter(e => {
       if(!e || typeof e.date !== 'string' || !(e.before > 0) || !(e.after > 0)) return false;
@@ -2675,9 +2834,22 @@ function adjustSeries(series, events){
       /* 上界原本是 5，正好把台股 80% 以上的彌補虧損型大減資擋在門外 ——
          那正是最需要還原的事件，而且被靜默丟掉。放寬到 25（減資 96%）。 */
       if(!(k > 0.2 && k < 25)){ dropped++; return false; }
-      /* 除息與減資同日時兩張官方表會各報一次同一個參考價，連乘會把倍數平方 */
-      if(seen.has(e.date)){ dropped++; return false; }
-      seen.add(e.date);
+      /* v87：這條去重原本假設「同日的兩張官方表報的是同一個參考價」。
+         實測不成立時，保留的是陣列裡先出現的那一筆——而 fetchStockLive 固定先 push div、
+         再 push cut，sort 又是穩定的，所以**減資那筆永遠被丟**。
+         實測同日 div(100→96) 與 cut(100→200)：還原倍數 0.96，正確（連乘）是 1.92，
+         事件日之前的整段歷史低估約 50%，直接餵進均線、布林與五年統計。
+
+         同日發生除息＋減資是真的會出現的（同一次股東會決議）。
+         正確作法是**兩筆都留、連乘**；只有在兩筆報的是同一個參考價
+         （k 幾乎相同、方向也相同）時才視為重複而去掉一筆。 */
+      const prevK = seen.get(e.date);
+      if(prevK != null){
+        const dup = Math.abs(prevK - k) / Math.max(prevK, k) < 0.01;
+        if(dup){ dropped++; return false; }        // 真的是同一個事件被報兩次
+        /* 不是重複 —— 兩件事真的都發生了，留著讓它們連乘 */
+      }
+      seen.set(e.date, k);
       /* 除息的還原倍數在數學上必須 ≤ 1；減資必須 ≥ 1 */
       if(e.kind === 'div' && k > 1.0001){ dropped++; return false; }
       if(e.kind === 'cut' && k < 0.9999){ dropped++; return false; }
@@ -2749,7 +2921,12 @@ function divPerShare(events){
                           .sort((a,b)=> a.date < b.date ? -1 : 1);
   if(!evs.length) return null;
   const sum = evs.reduce((a,e)=>a+e.amt, 0);
-  const yrs = Math.max(1, Math.round((Date.parse(evs[evs.length-1].date) - Date.parse(evs[0].date))/(365*86400000)) + 1);
+  /* v85：舊版用「跨了幾年 ＋ 1」當年數。對年配息股沒問題，
+     但季配息股的第一筆與最後一筆常常落在同一年的頭尾，跨距不到 5 年卻算成 6 年，
+     平均一年就被低估。實測五年 20 筆共 68.75 元：舊版印 11.46 元／年，正確是 13.75。
+     改成用**不同的除息年份數**——那才是「這幾年」的意思，跟一年配幾次無關。 */
+  const yrSet = new Set(evs.map(e=>String(e.date).slice(0,4)));
+  const yrs = Math.max(1, yrSet.size);
   return { sum:+sum.toFixed(2), n:evs.length, yrs, perYear:+(sum/yrs).toFixed(2),
            from:evs[0].date, to:evs[evs.length-1].date };
 }
@@ -3163,9 +3340,25 @@ async function silentReverify(){
     return false;
   }
 }
+/* 大盤只在還沒有真實資料時補抓一次。做成可以重複呼叫的形式，
+   這樣「手動驗證」「自動連線」「斷線後恢復」三條路都可以無腦呼叫它，不會重複打 API。 */
+function maybeLoadMarket(){
+  if(!state.live) return;
+  if(state.market && state.market.src === 'live') return;
+  try{ loadMarket(); }catch(e){ console.error('loadMarket failed:', e); }
+}
 function restoreConnection(){
   const was = state.live;
   state.live = true; state.netFail = 0; state.reconnect.attempt = 0;
+  /* v85：開機順序是「先 loadMarket()、再 bootAutoConnect()」，而自動連線是非同步的——
+     loadMarket 跑的時候 state.live 還是 false，於是走了「沒有大盤資料」那條路，
+     畫面印出「這一塊要連上 FinMind 才有內容 · 去輸入 FinMind Token」。
+     然後自動連線成功、徽章變綠，卻沒有任何東西回頭把大盤補上：
+     使用者看到的就是「已連線」與「還沒有大盤資料」同時出現在一個畫面上。
+     只有「手動按驗證並連線」那條路記得呼叫 loadMarket，自動那條沒跟上——
+     又是同一種缺陷：同一件事有兩條路，其中一條沒跟上。
+     收斂：連線一變綠就補抓。 */
+  setTimeout(maybeLoadMarket, 0);
   cancelReconnect(); setConnBadge('live');
   const w = $('envWarn'); if(w) w.classList.add('hidden');
   const h = $('tokenHint');
@@ -3192,6 +3385,12 @@ async function bootAutoConnect(){
   if(!state.autoConnect) return false;
   if(!state.rememberToken || !state.token) return false;   // 沒存 Token 就無從自動連起
   if(state._loggedOut) return false;
+  /* v85：閘門仍然是「今天抓過沒」，但「抓過」的定義改成**抓成功過**。
+     第一版我改成問「手上的資料是不是新鮮的」——那是錯的：
+     從本機還原的資料一律標成 'stale'（那是刻意的設計，讓使用者知道那是舊資料），
+     所以那個條件在開機時永遠不成立，等於每次打開都重抓一整輪，額度直接爆掉。實測 26 次。
+     正確的作法是：先記日期（避免當機造成無限重抓），
+     抓完如果有失敗就把日期清掉，下次打開會再試一次。 */
   const willFetch = state.lastAutoFetch !== todayISO() && watchItems().length > 0;
   /* 等一下就要跳進度列的話，就不要再多一則「已連線」提示——
      進度列本身就是最清楚的回饋，兩個一起出現只是把畫面推得更長。 */
@@ -3204,6 +3403,10 @@ async function bootAutoConnect(){
   state.lastAutoFetch = todayISO(); persist();
   try{ await startBulk('w'); }
   catch(e){ console.error('auto fetch failed:', e); }
+  /* 抓壞了就別把今天記成「已完成」——不然使用者會看到「已連線」配上一排「⟳ 未更新」，
+     而且同一天再怎麼重開都不會補抓。 */
+  const bk = state.bulk || {};
+  if(!(bk.ok > 0) || bk.fail > 0 || bk.cancel){ state.lastAutoFetch = ''; persist(); }
   return true;
 }
 
@@ -3218,6 +3421,16 @@ function degradeConnection(e){
   /* 端點權限問題（例如即時報價需要 sponsor）不影響主要連線，不得把 state.live 拆掉 */
   if(e && (e.kind === 'sponsor' || e.kind === 'rtunknown' || e.kind === 'rtempty' || e.kind === 'endpoint')) return;
   const kind = e && e.kind;
+  /* v85：classifyFetchError 已經明確判定 navigator.onLine === false 並產生 kind 'offline'，
+     但舊版把它丟進「網路類問題連續失敗 3 次才降級」那條路，於是徽章還寫著
+     「已連線 FinMind 真實數據 · 連線不穩（2/3）」——程式知道沒網路，卻在最大的那顆徽章上說謊。
+     沒網路是確定的事實，不是統計問題，不需要三振。 */
+  if(kind === 'offline'){
+    state.live = false; state.connKind = 'offline'; state.netFail = 0;
+    setConnBadge('down', '· 這台裝置沒有網路');
+    scheduleReconnect('offline', 30);
+    return;
+  }
 
   if(kind === 'quota'){
     const wait = secsToNextHour();
@@ -3509,14 +3722,19 @@ function ttmFromYTD(map){
            how: `${last} 累計 ＋ ${y-1} 全年 − ${prevSame} 累計` };
 }
 
+/* 這一輪抓取裡，有沒有任何一筆是靠快取回答的；有的話取**最舊**那一筆的時間，
+   因為使用者看到的整組數字最舊就到那一刻。 */
 async function fetchStockLive(s){
+  let __cacheAt = null, __anyNet = false;
+  const __mark = ()=>{ if(lastFetchCacheAt == null) __anyNet = true;
+                       else if(__cacheAt == null || lastFetchCacheAt < __cacheAt) __cacheAt = lastFetchCacheAt; };
   const out = { price:null, eps:null, debt:null, holder:null, holderPrev:null, series:[], err:null,
                 per:null, pbr:null, divYield:null, perHist:null, pbrHist:null, perAsOf:null };
 
   // 6-0 股票中文名稱與產業（自選標的常常只有代號，這裡向 FinMind 查正確名稱）
   if(!s.nameVerified){
     try{
-      const info = await finmind('TaiwanStockInfo', { data_id:s.id });
+      const info = await finmind('TaiwanStockInfo', { data_id:s.id }); __mark();
       const hit = info.find(r=>r.stock_id===s.id) || info[0];
       if(hit && hit.stock_name){
         s.name = hit.stock_name;
@@ -3528,7 +3746,7 @@ async function fetchStockLive(s){
   // 6-1 價格序列（一次抓約 520 天，供 20MA/60MA/240MA 與標準差計算）
   try{
     /* 自選標的多抓 5 年，供「出場參考」的自身歷史統計；百大 100 檔維持 520 天以節省記憶體 */
-    const p = await finmind('TaiwanStockPrice', { data_id:s.id, start_date: dstr(s.inWatch ? -1830 : -520) });
+    const p = await finmind('TaiwanStockPrice', { data_id:s.id, start_date: dstr(s.inWatch ? -1830 : -520) }); __mark();
     const ser = p.map(r=>({ date:r.date, close:+r.close })).filter(x=>x.close>0)
                  .sort((a,b)=> a.date < b.date ? -1 : (a.date > b.date ? 1 : 0));
     if(ser.length){ out.series = ser; out.price = ser[ser.length-1].close; out.asOf = ser[ser.length-1].date; }
@@ -3539,7 +3757,7 @@ async function fetchStockLive(s){
      台灣財報累計制(YTD)沒拆單季、四季連續性、財報新鮮度、KY 股與金控子公司抓不到。
      官方已經算好，直接用；同時拿到 5 年日序列，位階判定就不必再靠任何編出來的倍數。 */
   try{
-    const pr = await finmind('TaiwanStockPER', { data_id:s.id, start_date: dstr(-1830) });
+    const pr = await finmind('TaiwanStockPER', { data_id:s.id, start_date: dstr(-1830) }); __mark();
     const rows = (pr||[]).map(r=>({ date:r.date, per:+r.PER, pbr:+r.PBR, dy:+r.dividend_yield }))
                          .filter(x=>x.date)
                          .sort((a,b)=> a.date < b.date ? -1 : (a.date > b.date ? 1 : 0));
@@ -3559,7 +3777,7 @@ async function fetchStockLive(s){
 
   // 6-2 EPS（綜合損益表）—— 必須湊滿 4 個連續季度才算 TTM，否則寧可不給
   try{
-    const f = await finmind('TaiwanStockFinancialStatements', { data_id:s.id, start_date: dstr(-560) });
+    const f = await finmind('TaiwanStockFinancialStatements', { data_id:s.id, start_date: dstr(-560) }); __mark();
     // 精確比對 type，避免抓到 DilutedEPS 等其他每股盈餘欄位
     // 先找出這份資料裡到底有哪些 type，再決定用哪一個當 EPS
     const types = [...new Set(f.map(r=>String(r.type||'')))];
@@ -3608,7 +3826,7 @@ async function fetchStockLive(s){
 
   // 6-3 負債比（資產負債表）
   try{
-    const b = await finmind('TaiwanStockBalanceSheet', { data_id:s.id, start_date: dstr(-500) });
+    const b = await finmind('TaiwanStockBalanceSheet', { data_id:s.id, start_date: dstr(-500) }); __mark();
     if(b.length){
       const latest = b.reduce((m,r)=> (r.date>m?r.date:m), b[0].date);
       const rows = b.filter(r=>r.date===latest);
@@ -3643,7 +3861,7 @@ async function fetchStockLive(s){
      四塊拼圖缺一塊就不給數字，也不猜——這是當初自算本益比翻車的同一個坑。 */
   if(s.inWatch){
     try{
-      const cf = await finmind('TaiwanStockCashFlowsStatement', { data_id:s.id, start_date: dstr(-1000) });
+      const cf = await finmind('TaiwanStockCashFlowsStatement', { data_id:s.id, start_date: dstr(-1000) }); __mark();
       const ctypes = [...new Set((cf||[]).map(r=>String(r.type||'')))];
       logField('現金流量表 (CashFlowsStatement)', '可用 type', ctypes.slice(0,20).join(', ') + (ctypes.length>20?' …':''));
       const ocfType = ctypes.find(t=>/^NetCashInflowFromOperatingActivities$/i.test(t))
@@ -3688,7 +3906,7 @@ async function fetchStockLive(s){
   if(s.inWatch){
     const ev = [];
     try{
-      const dv = await finmind('TaiwanStockDividendResult', { data_id:s.id, start_date: corpEventStart(s) });
+      const dv = await finmind('TaiwanStockDividendResult', { data_id:s.id, start_date: corpEventStart(s) }); __mark();
       (dv||[]).forEach(r=>{
         const before = +r.before_price, after = +r.after_price, amt = +r.stock_and_cache_dividend;
         if(!r.date) return;
@@ -3698,7 +3916,7 @@ async function fetchStockLive(s){
       });
     }catch(e){ if(isFatal(e)) throw e; }
     try{
-      const cr = await finmind('TaiwanStockCapitalReductionReferencePrice', { data_id:s.id, start_date: corpEventStart(s) });
+      const cr = await finmind('TaiwanStockCapitalReductionReferencePrice', { data_id:s.id, start_date: corpEventStart(s) }); __mark();
       (cr||[]).forEach(r=>{
         const before = +r.ClosingPriceonTheLastTradingDay, after = +r.PostReductionReferencePrice;
         if(!r.date) return;
@@ -3720,7 +3938,7 @@ async function fetchStockLive(s){
   if(state.holderUnavailable){
     out.holderNote = '千張大戶是 FinMind backer／sponsor 專屬資料集，免費方案無法取得（已略過，不消耗額度）';
   } else try{
-    const h = await finmind('TaiwanStockHoldingSharesPer', { data_id:s.id, start_date: dstr(-70) });
+    const h = await finmind('TaiwanStockHoldingSharesPer', { data_id:s.id, start_date: dstr(-70) }); __mark();
     const levels = [...new Set(h.map(r=>String(r.HoldingSharesLevel||'')))];
     logField('集保 (HoldingSharesPer)', '可用級距', levels.join(' | '));
     let bigLevel = levels.find(L=>/1,?000,?001/.test(L));
@@ -3748,6 +3966,8 @@ async function fetchStockLive(s){
     } else out.err = out.err || e.message;
   }
 
+  /* 這一輪只要有任何一筆真的送出網路請求，就不算「整批來自快取」。 */
+  out.__cacheAt = __anyNet ? null : __cacheAt;
   return out;
 }
 
@@ -3877,7 +4097,14 @@ function applyStockData(s, d, src){
     err: d.err || null,
     src: src || (s.data && s.data.src) || 'mock',
     /* reapply 不帶新資料時不該謊報抓取時間 —— 只有真的剛抓回來才更新 */
-    fetchedAt: (src==='live' && !d.__reapply) ? new Date() : (s.data ? s.data.fetchedAt : null),
+    /* v87：舊版只要 src==='live' 就把「抓取於」設成現在。
+       但整批資料可能全部來自 30 分鐘前的快取（API 掛掉時尤其明顯），
+       於是畫面用一個新鮮的時間戳背書一批舊資料。
+       d.__cacheAt 由 fetchStockLive 帶進來：這批資料實際是哪一刻拿到的。 */
+    fetchedAt: (src==='live' && !d.__reapply)
+      ? (d.__cacheAt ? new Date(d.__cacheAt) : new Date())
+      : (s.data ? s.data.fetchedAt : null),
+    fromCache: (src==='live' && !d.__reapply) ? !!d.__cacheAt : (s.data ? s.data.fromCache : false),
     rtTime: s.data ? s.data.rtTime : null,
     rtBaseAsOf: s.data ? s.data.rtBaseAsOf : null,
     rtRate: s.data ? s.data.rtRate : null,
@@ -4024,11 +4251,23 @@ async function fetchOneLive(s, opts={}){
     return;
   }
   s.data = s.data || {};
+  /* v87：這裡先寫 loading，下面兩個 `if(!stillValid()) return;` 卻不還原它。
+     state.gen 守住了「舊回應蓋掉新狀態」，但沒守住「舊回應留下的中間狀態」——
+     實測抓取中被 invalidateGeneration() 中止後，那一列永遠停在「⏳ 抓取中…」，
+     實際上沒有任何請求在跑，而使用者不會知道要按重新整理。 */
+  const prevSrc = s.data.src, prevLoaded = s.loaded;
+  const restoreIfAborted = () => {
+    if(s.data && s.data.src === 'loading'){
+      s.data.src = (prevSrc && prevSrc !== 'loading') ? prevSrc : 'none';
+      s.loaded = prevLoaded;
+      try{ renderTable(); }catch(e){}
+    }
+  };
   s.data.src = 'loading'; s.loaded = true;
   renderTable();
   try{
     const d = await fetchStockLive(s);
-    if(!stillValid()) return;      // 清單已變動或有更新的請求，丟棄這次結果
+    if(!stillValid()){ restoreIfAborted(); return; }   // 清單已變動或有更新的請求，丟棄這次結果
     if(d.price === null){
       markFetchFailed(s, d.err);
       toast(`${s.id} 查無資料：${s.data.err}`, 'warn');
@@ -4038,7 +4277,7 @@ async function fetchOneLive(s, opts={}){
       toast(`已取得 ${s.id} ${s.name} 真實數據：收盤 ${fmt(s.data.price)}${s.data.pe?`、本益比 ${fmt(s.data.pe,1)}`:''} → ${v.light} ${v.label}`, 'ok');
     }
   }catch(e){
-    if(!stillValid()) return;
+    if(!stillValid()){ restoreIfAborted(); return; }
     markFetchFailed(s, e.message);
     toast(`${s.id} 抓取失敗：${e.message}`, 'err');
   }
@@ -4510,7 +4749,17 @@ function noteLine(s, d, animals, v, real){
     rows.push(['持股一千張以上的大戶，連續兩週在買', 'text-slate-300']);
   if(A.has('horse') && d.pnl != null)
     rows.push([`這檔賺了 ${pct(d.pnl)}`, 'text-emerald-300']);
-  if(!rows.length) return '<span class="text-slate-400 text-[13px]">沒有。</span>';
+  /* v85：🐖 豬與 🐢 烏龜有動物標籤，卻沒有對應的白話句——
+     畫面上因此出現「🐖 豬　沒有。」：圖示成了唯一的資訊來源，
+     而這份程式的設計原則正好相反（高齡使用者不會先看圖示）。 */
+  if(A.has('pig'))
+    rows.push([`本益比在這檔自己五年裡屬於偏高的位置${d.pe!=null?`（現在 ${fmt(d.pe,1)} 倍）`:''}`, 'text-rose-300 font-semibold']);
+  if(A.has('turtle') && d.debt != null)
+    rows.push([`公司借的錢只佔資產 ${(d.debt*100).toFixed(1)}%，財務結構穩健`, 'text-emerald-300']);
+  if(A.has('deadcat'))
+    rows.push(['年線下方的無量急拉，多半是反彈不是反轉', 'text-fuchsia-300']);
+  if(!rows.length)
+    return '<span class="text-slate-400 text-[13px]">目前這一檔沒有觸發任何提醒。</span>';
   const [first, cls] = rows[0];
   const rest = rows.slice(1);
   return `<div class="cell-note text-[14px] leading-snug ${cls}">${first}</div>` +
@@ -4596,9 +4845,17 @@ function sharesOutstanding(d){
          實測台積電差 0.7%（推算 9.93 元，實際 10 元）。
          貼齊之後就能改用 股本 ÷ 面額，那條關係是定義上精確的，不含任何雜訊。
          貼不上任何一個實際面額時，才退回用推算的股數本身——那時不宣稱知道面額。 */
+      /* 貼齊是個門檻，門檻一定有斷崖：raw=9.50 貼得上 10、raw=9.49 貼不上，
+         兩者輸入只差 0.1%，股數卻差 5.4%。斷崖消不掉（那是離散化的本質），
+         但可以**講出來**：接近邊界時把原始推算值一起印出來，讓使用者知道這裡不精確。 */
       const snap = PAR_STEPS.find(v => Math.abs(raw - v) / v <= PAR_SNAP_TOL);
-      if(snap) return { shares: d.capStock / snap, src:'official', par: snap, rawPar:+raw.toFixed(3),
-                        how:'由官方權益與股價淨值比推算面額為 ' + snap + ' 元，再用 股本 ÷ 面額 取得股數' };
+      if(snap){
+        const rel = Math.abs(raw - snap) / snap;
+        return { shares: d.capStock / snap, src:'official', par: snap, rawPar:+raw.toFixed(3),
+                 nearEdge: rel > PAR_SNAP_TOL * 0.6,
+                 how:'由官方權益與股價淨值比推算面額為 ' + snap + ' 元，再用 股本 ÷ 面額 取得股數'
+                     + (rel > PAR_SNAP_TOL*0.6 ? `（原始推算 ${raw.toFixed(2)} 元，離 ${snap} 有點距離，這一檔的股數可能有幾 % 誤差）` : '') };
+      }
       return { shares:nByPbr, src:'official', par:null, rawPar:+raw.toFixed(3),
                how:'權益 × 股價淨值比 ÷ 股價（推算面額 ' + fmt(raw,2) + ' 元對不上任何常見面額，因此不用面額換算）' };
     }
@@ -4617,7 +4874,9 @@ function parNote(d){
   if(r.par == null)
     return '<span class="text-slate-500">這一檔推算出來的面額對不上任何常見面額，因此股數直接由官方權益與股價淨值比取得，沒有經過面額換算。</span>';
   return '<span class="text-slate-500">面額由官方數字推算為 <strong class="text-slate-300">'
-       + fmt(r.par,2) + ' 元</strong>' + (r.par === 10 ? '（就是常見的 10 元）' : '——<span class="text-amber-300">不是 10 元</span>') + '。</span>';
+       + fmt(r.par,2) + ' 元</strong>' + (r.par === 10 ? '（就是常見的 10 元）' : '——<span class="text-amber-300">不是 10 元</span>')
+       + (r.nearEdge ? `。<span class="text-amber-300/90">不過原始推算值是 ${fmt(r.rawPar,2)} 元，離 ${r.par} 有一段距離，所以這一檔的每股數字可能有幾 % 誤差</span>` : '')
+       + '。</span>';
 }
 
 /* ══ 自由現金流殖利率 ══════════════════════════════════════════
@@ -4884,13 +5143,17 @@ function priceLadder(d){
   const t = d.targets || {}, p = d.price;
   const longOk = t.longOk && !t.longBroken;
   const pts = [
-    t.shortBuy!=null ? { v:t.shortBuy, l:'短期超賣買點 🐆', c:'#34d399' } : null,
-    longOk ? { v:t.cheap, l:'長期便宜價 🐂', c:'#22c55e' } : null,
-    t.midWarn!=null ? { v:t.midWarn, l:'中期轉弱價 🦏', c:'#fb923c' } : null,
-    t.midBuy!=null ? { v:t.midBuy, l:'中期加碼價 🐋', c:'#22d3ee' } : null,
-    longOk ? { v:t.fair, l:'長期合理價 📊', c:'#facc15' } : null,
-    t.shortSell!=null ? { v:t.shortSell, l:'短期超買賣點 🐱', c:'#f472b6' } : null,
-    longOk ? { v:t.rich, l:'長期昂貴價 🐖', c:'#ef4444' } : null
+    /* v85：這裡的顏色是行內 style，Tailwind 的色階覆蓋管不到。
+       實測 #ef4444 在這個底色上只有 4.94:1，#f472b6 是 7.02——
+       兩個都低於高齡實務該有的 7:1，而這一排正是「現在離哪一條最近」的答案。
+       全部換成亮一階的同色系，紅還是紅、綠還是綠，只是看得清楚。 */
+    t.shortBuy!=null ? { v:t.shortBuy, l:'短期超賣買點 🐆', c:'#6ee7b0' } : null,
+    longOk ? { v:t.cheap, l:'長期便宜價 🐂', c:'#86efac' } : null,
+    t.midWarn!=null ? { v:t.midWarn, l:'中期轉弱價 🦏', c:'#fdba74' } : null,
+    t.midBuy!=null ? { v:t.midBuy, l:'中期加碼價 🐋', c:'#67e8f9' } : null,
+    longOk ? { v:t.fair, l:'長期合理價 📊', c:'#fde047' } : null,
+    t.shortSell!=null ? { v:t.shortSell, l:'短期超買賣點 🐱', c:'#f9a8d4' } : null,
+    longOk ? { v:t.rich, l:'長期昂貴價 🐖', c:'#fca5a5' } : null
   ].filter(Boolean).sort((a,b)=>a.v-b.v);
   if(!pts.length || !p) return '<div class="text-[11px] text-slate-400">目標價資料不足（可能缺少 EPS 或價格序列）。</div>';
 
@@ -4936,13 +5199,33 @@ function priceLadder(d){
     }
   }
 
+  /* v86：長線那三條被拿掉時，舊版是**默默消失**——使用者看到的是一張只有四條的表，
+     完全沒有線索。實測 2327 國巨（本益比 38.8、近 4.8 年最貴的 5%）就是這個畫面，
+     使用者的原話是「為什麼沒有長期價格」。他問得對：畫面沒有回答他。
+     不列價位是對的（那些數字會荒謬到誤導），但**不列的理由必須寫在原地**，
+     而不是要使用者自己去別的區塊拼湊。 */
+  let longNote = '';
+  if(!longOk){
+    const why = t.longBroken
+      ? (t.longWhy === 'trend'
+          ? '這檔的本益比長期在往上走，用它自己的歷史分位換算出來的價位會嚴重偏離現實'
+          : `現在的本益比已經完全脫離這檔自己過去五年的區間${t.peNow?`（現在 ${fmt(t.peNow,1)} 倍）`:''}`)
+      : '這檔目前算不出可用的本益比（EPS 是負的、缺漏，或財報季度不連續）';
+    longNote = `<div class="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/[.08] p-2.5 text-[13px] text-amber-200 leading-relaxed">
+      <div class="font-bold mb-1">為什麼上面沒有「長期便宜價／合理價／昂貴價」？</div>
+      ${why}，所以本頁<strong>不列出長線價位</strong>——
+      硬算出來的數字會離現價很遠，看起來很具體，但那是假的精確。<br>
+      <span class="text-amber-300/90">上面那四條是<strong>技術面</strong>的位置（均線與布林通道），它們仍然有效。
+      長線該不該買，這一頁這次不給答案。</span></div>`;
+  }
+
   return `
     <div class="relative h-14 mt-7 mb-1">
       <div class="absolute inset-x-0 top-1.5 h-1 rounded-full bg-gradient-to-r from-emerald-600 via-amber-500 to-rose-600 opacity-70"></div>
       ${marks}${cursor}
     </div>
     <div class="mt-2 bg-slate-950/50 rounded-lg px-2.5 py-1 border border-slate-700/40">${list}</div>
-    ${crowdNote}`;
+    ${longNote}${crowdNote}`;
 }
 
 function exitPanelHTML(s){
@@ -4951,7 +5234,12 @@ function exitPanelHTML(s){
   const B = peBands(d.ind, d);
   const es = exitStats(d);
   const isSelf = B.basis === 'self';
-  const eps = (d.per > 0) ? d.price / d.per : d.eps;
+  /* v85：這是 perBaseClose() 的過時手抄副本。用「今天的價格 ÷ 昨天公布的本益比」，
+     於是同一個面板左右欄會自相矛盾：左欄「昂貴 1,145」、右欄「到偏貴區 $1,717.5」，
+     而且不管現價 700 / 1000 / 1500，右欄的「距現價」永遠印同一組 −0.5%/+14.5%。
+     跟先前修過的目標價是同一個錯：分子分母不是同一天。 */
+  const epsPx = perBaseClose(d);
+  const eps = (d.per > 0 && epsPx > 0) ? epsPx / d.per : d.eps;
   const row = (label, per, cls) => {
     if(!(eps > 0) || !(per > 0)) return '';
     const target = eps * per;
@@ -5288,10 +5576,17 @@ async function loadMarket(){
   const volAvg20 = vols.slice(-20).reduce((a,b)=>a+b,0)/Math.max(1,Math.min(20,vols.length));
   const lastVol = vols[vols.length-1] || 0;
 
+  /* v85：大盤區塊過去完全沒有新鮮度閘門——srcBadge 只收到 {src}，沒有 asOf，
+     所以 ageTag 永遠回 null。實測讓 TAIEX 回傳 400 天前的序列，畫面照樣是綠色「真實」，
+     而且還印出「🐻➜🐂 深度負乖離加碼訊號（便宜買點）」＋「如果你正在考慮動用生活費…」。
+     個股那邊 400 天舊會被標「⛔ 資料 400 天前」並拒絕判定位階，大盤卻照講——同一頁兩套標準。 */
+  const mAsOf = series.length ? series[series.length-1].date : null;
+  const mStale = staleBad(staleDays(mAsOf));
   state.market = { series, ma, last, bias, dayChg, maFull, bars: closes.length, src: marketSrc,
+                   asOf: mAsOf, stale: mStale,
                    lowVolume: volAvg20>0 && lastVol < volAvg20*0.8 };
 
-  $('taiexClose').innerHTML = fmt(last,0) + '<div class="mt-1">' + srcBadge({src:marketSrc}) + '</div>';
+  $('taiexClose').innerHTML = fmt(last,0) + '<div class="mt-1">' + srcBadge({src:marketSrc, asOf:mAsOf}) + '</div>';
   $('taiexMaLabel').textContent = maFull ? '240MA 年線' : `${n}日均線（資料不足 240 筆）`;
   $('taiexMa').innerHTML = fmt(ma,0) + (maFull?'':'<span class="text-[10px] text-amber-400 block">⚠ 非年線</span>');
   const bEl = $('taiexBias');
@@ -5305,9 +5600,13 @@ async function loadMarket(){
     animals.push('bear');
     if(dayChg > 2 && state.market.lowVolume) animals.push('deadcat');
   }
-  const gateOff = (marketSrc !== 'live' || !maFull);
+  /* 過期的大盤資料一律不判定方向，跟個股同一套標準。 */
+  const gateOff = (marketSrc !== 'live' || !maFull || mStale);
   $('marketAnimals').innerHTML = (gateOff
-    ? `<span class="tag border bg-amber-500/15 text-amber-300 border-amber-500/40 text-xs px-2.5 py-1">⚠ ${marketSrc!=='live'?'示範值，不判定方向':'資料不足 240 筆，不判定方向'}</span>`
+    ? `<span class="tag border bg-amber-500/15 text-amber-300 border-amber-500/40 text-xs px-2.5 py-1">⚠ ${
+        marketSrc!=='live' ? '示範值，不判定方向'
+        : mStale ? `大盤資料是 ${esc(String(mAsOf||'未知'))} 的，太舊了，不判定方向`
+        : '資料不足 240 筆，不判定方向'}</span>`
     : '') + animals.map(k=>{
     const A = ANIMALS.find(x=>x.k===k);
     const c = {bull:'bg-emerald-500/15 text-emerald-300 border-emerald-500/40',
@@ -5319,11 +5618,13 @@ async function loadMarket(){
   // 訊號燈
   const box = $('marketSignal'); const sec = $('blockA');
   sec.classList.remove('glow-green','glow-red');
-  if(marketSrc !== 'live' || !maFull){
+  if(gateOff){
     box.className = 'rounded-lg p-3 text-xs leading-relaxed border border-amber-500/40 bg-amber-500/10 text-amber-200';
     box.innerHTML = `<div class="font-bold mb-1">⚠ 不發出大盤位階訊號</div>` +
       (marketSrc !== 'live'
         ? `目前大盤資料為<strong>示範值</strong>${marketErr?`（真實抓取失敗：${esc(marketErr)}）`:''}，不是真實行情。上方的收盤價、年線與乖離率都<strong>不能當真</strong>。請輸入 FinMind Token 連線後重新載入。`
+        : mStale
+        ? `大盤資料只到 <strong>${esc(String(mAsOf||'未知'))}</strong>，距今太久，用它算出來的年線與乖離率沒有參考價值。請按上方「重新整理本頁」重新取得。`
         : `真實資料僅取得 ${closes.length} 個交易日，不足 240 筆，無法計算年線，因此不判定買賣位階。`);
   } else if(last < ma && bias < -10){
     sec.classList.add('glow-green');
@@ -5371,15 +5672,29 @@ function renderBlockB(){
   /* 區塊 C 有 blockCQuality 品質列，區塊 B 一直沒有 —— 於是模擬值可以在這裡
      產出「✅ 配置健康」「🐖 建議減碼」與整排 🐋 鯨魚。補上同一道閘門。 */
   const allHold = heldItems();
-  const holdings = allHold.filter(s=>dataReal(s.data));
-  const demoN = allHold.length - holdings.length;
+  /* v87：區塊 C 已經收斂到 dataUsable（含 30 天新鮮度），這裡還停在 dataReal。
+     實測同一個畫面：每一列標「⛔ 資料 100 天前」、首屏說「還差一個今天的股價」、
+     區塊 C 說「0 檔可用」，而這裡照樣印出「2330 佔比 71.4%」與「🐖 貪婪集中警示」——
+     用三個月前的價格下「集中度超標」的結論。同一道閘門。 */
+  const holdings = allHold.filter(s=>dataUsable(s.data));
+  /* v87：閘門從 dataReal 換成 dataUsable 之後，被排除的原因有兩種——
+     「還是示範值」與「資料太舊」。文案原本只講前者，
+     於是使用者看到一句方向錯誤的說明（他明明抓過真資料），
+     還被叫去做一件沒有用的事（重新輸入 Token）。分開講。 */
+  const excl = allHold.filter(s=>!dataUsable(s.data));
+  const demoN = excl.filter(s=>!dataReal(s.data)).length;
+  const staleN = excl.length - demoN;
   const bq = $('blockBQuality');
   if(bq){
-    if(demoN){
+    if(excl.length){
       bq.classList.remove('hidden');
+      const why = [];
+      if(demoN)  why.push(`${demoN} 檔還是示範值`);
+      if(staleN) why.push(`${staleN} 檔的資料太舊（超過 ${STALE_MAX} 天）`);
       bq.innerHTML = holdings.length
-        ? `⚠ ${demoN} / ${allHold.length} 檔持股的價格還是示範值，<strong>已排除在下方的比重與集中度計算之外</strong>。`
-        : `⚠ ${allHold.length} 檔持股的價格全是示範值，<strong>無法計算比重與集中度</strong>。請輸入 Token 連線後按「⚡ 抓取全部自選」。`;
+        ? `⚠ ${excl.length} / ${allHold.length} 檔持股${why.join('、')}，<strong>已排除在下方的比重與集中度計算之外</strong>。`
+        : `⚠ ${allHold.length} 檔持股全部不可用（${why.join('、')}），<strong>無法計算比重與集中度</strong>。`
+          + (staleN ? '請按「⚡ 抓取最新資料」重新取得。' : '請輸入 Token 連線後按「⚡ 抓取全部自選」。');
     } else bq.classList.add('hidden');
   }
   let rows = holdings.map(s=>({ id:s.id, name:s.name, mv: s.data.price * s.shares }))
@@ -5416,7 +5731,9 @@ function renderBlockB(){
                  <span class="tabular-nums font-bold shrink-0 ${over?'text-rose-300':'text-slate-300'}">${SENS(pc.toFixed(1)+'%')}${over?' ⚠':''}</span>
                </div>
                <div class="h-2.5 rounded bg-slate-800 overflow-hidden mt-0.5">
-                 <div class="h-full rounded ${over?'bg-amber-400':(r.id==='其他'?'bg-slate-500':'bg-cyan-400')}" style="width:${(pc/scale*100).toFixed(1)}%"></div>
+                 <!-- v85：百分比文字有遮，但長條寬度沒遮——集中度仍然目測得出來。
+                      隱私模式下一律畫成等長，遮蔽才是完整的。 -->
+                 <div class="h-full rounded ${over?'bg-amber-400':(r.id==='其他'?'bg-slate-500':'bg-cyan-400')}${state.privacy?' opacity-40':''}" style="width:${state.privacy?'100':(pc/scale*100).toFixed(1)}%"></div>
                </div>
              </div>`;}).join('')}</div>
          </div>
@@ -5709,9 +6026,27 @@ function syncModalOpen(){
    而 WATCH_INIT 的預設是 cost:0 —— 於是一個剛連上線、還沒填成本的使用者，
    首屏說「你還沒有填入任何成本價」，資產配置同時對這個不存在的部位發出
    「🐖 佔比 100%，已超過 30% 上限」。收斂成一個函式。 */
+/* v87：舊版篩子是 `s.cost > 0`。但 s.cost 是 applyPosition 寫進去的**每股平均成本**，
+   現金減資退還股款超過剩餘成本時它會被壓成 0（v85 特地實作的那條路徑），
+   於是那一檔連同市值一起從首屏與區塊 C 消失——實測首屏對一個手上還有 500 股、
+   有兩筆紀錄的使用者說「你還沒有記下任何買賣紀錄」。
+   有股數就是有持倉，跟每股成本是不是 0 無關。 */
 function heldItems(){
-  return state.watchlist.filter(s=>s.inWatch && s.loaded && s.cost > 0 && s.shares > 0
+  return state.watchlist.filter(s=>s.inWatch && s.loaded && s.shares > 0
                                    && s.data && s.data.price > 0);
+}
+/* 全站唯一一份「這一檔到今天總共賺賠多少」。
+   v82 修好了區塊 C，v85 修好了交易紀錄頁，但**首屏那一份沒跟上**——
+   而首屏是全頁字級最大、位置最前的數字。實測同一個持倉：
+   首屏 198,860、區塊 C 401,295、交易紀錄頁 401,295，三個地方兩種答案。
+   收斂成一個函式，讓「三份副本其中一份沒跟上」在結構上不可能發生。 */
+function pnlOf(s){
+  const q = positionOf(s);
+  const px = (s.data && s.data.price > 0) ? s.data.price : 0;
+  const mv = q.shares > 0 ? q.shares * px : 0;
+  const unreal = (q.shares > 0 && px > 0) ? mv - q.cost : 0;
+  return { q, mv, cost:q.cost, unreal, realized:q.realized, divCash:q.divCash,
+           total: unreal + q.realized + q.divCash };
 }
 function renderMyPnl(){
   const box = $('myPnlBody');
@@ -5737,9 +6072,14 @@ function renderMyPnl(){
     return;
   }
 
-  let cost=0, mv=0;
-  real.forEach(s=>{ cost += s.cost*s.shares; mv += s.data.price*s.shares; });
-  const amt = mv - cost, p = cost>0 ? amt/cost*100 : 0;
+  let cost=0, mv=0, realized=0, divc=0;
+  real.forEach(s=>{ const r = pnlOf(s); cost += r.cost; mv += r.mv; realized += r.realized; divc += r.divCash; });
+  /* v87：舊版 amt = mv − cost，只有未實現。賣掉已經賺到手的錢與領到的股利一毛都沒進來，
+     而下方的除權息卡片還寫著「已算進上面的『到今天總共賺賠』」——上面根本沒有那個數字。 */
+  const unreal = mv - cost;
+  const amt = unreal + realized + divc;
+  const extra = (realized !== 0 || divc > 0);
+  const p = cost>0 ? unreal/cost*100 : 0;
   const up  = amt >= 0;
   const col = up ? 'text-rose-400' : 'text-emerald-400';
   const word= up ? '賺' : '賠';
@@ -5754,7 +6094,11 @@ function renderMyPnl(){
      舊版一律收 0.3%，只在括號裡寫「ETF 是 0.1%」——程式在小字裡寫了規則卻不套用。
      實測 0050 + 00878 的組合多扣 7,600 元。 */
   const isETF = id => /^00/.test(String(id||''));
-  const taxOf = s => isETF(s.id) ? 0.001 : 0.003;
+  /* v85：這是證交稅率的**第二份手抄副本**，而它漏了「債券 ETF 停徵」那條
+     （txnTaxRate 有，這裡沒有）。實測 00679B 市值 120 萬：這裡印「證交稅 −1,200 元」，
+     正確答案是 0 元。同一個稅率在兩個地方各寫一次，其中一份沒跟上——
+     這正是這份程式的招牌缺陷。收斂成同一個函式。 */
+  const taxOf = s => txnTaxRate(s.id);
   let fee = 0, tax = 0;
   real.forEach(s=>{ const m2 = s.data.price*s.shares; fee += m2*FEE; tax += m2*taxOf(s); });
   const sellCost = fee + tax;
@@ -5776,7 +6120,11 @@ function renderMyPnl(){
     .map(s=>{
       const a2 = (s.data.price - s.cost) * s.shares;
       const u2 = a2 >= 0;
-      return `<div class="flex items-center justify-between gap-2 py-2 border-b border-white/5 last:border-0">
+      /* v85：字級「大」＋390px 時，左欄（成本→現價）與右欄（賺賠金額）會壓在一起——
+         實測水平重疊 2px、垂直重疊 22px，「成本每股 801.14 元」直接被「賺 607,720 元」蓋住。
+         原因是 flex 一行兩欄 ＋ 左欄 min-w-0：內容 151px 卻被壓到 128px。
+         窄畫面就別硬擠成兩欄，改成上下排（.pnl-row），寬畫面維持原樣。 */
+      return `<div class="pnl-row flex items-center justify-between gap-2 py-2 border-b border-white/5 last:border-0">
         <div class="min-w-0">
           <div class="text-[15px] font-semibold text-slate-100 truncate">${safeText(s.name,20)}<span class="text-[12px] font-normal text-slate-400 ml-1.5">${esc(s.id)}</span></div>
           <!-- v68：這兩行以前會被拆成「… → 現」「在每股 …」。
@@ -5826,7 +6174,7 @@ function renderMyPnl(){
                    if(q.firstBuy && q.divCash > 0)
                      return `你在 <strong>${esc(q.firstBuy)}</strong> 之後買進，依官方除權息資料，實際配到你手上的現金大約是
                              <strong class="text-amber-200">${SENS(Math.round(q.divCash).toLocaleString('zh-TW'))} 元</strong>
-                             <span class="text-[12px] text-slate-400">（已算進上面的「到今天總共賺賠」）</span>`;
+                             <span class="text-[12px] text-slate-400">（已經算進最上面那個金額裡了）</span>`;
                    if(q.firstBuy)
                      return `<span class="text-[12px] text-slate-400">你在 ${esc(q.firstBuy)} 之後買進，這段期間官方資料上還沒有配過息。</span>`;
                    return `<span class="text-[13px] text-slate-400">若這 ${dp.yrs} 年你都持有 ${SENS(shareText(s.shares))}，累計大約會領到
@@ -5875,12 +6223,15 @@ function renderMyPnl(){
 
   box.innerHTML =
     `<div class="rounded-xl bg-slate-950/50 border border-slate-700/50 p-3 sm:p-4 mb-3">
-       <div class="text-[14px] text-slate-300 mb-1">${state.privacy ? '隱私模式開啟中，金額已隱藏' : `你這 ${real.length} 檔股票，現在總共<strong>${word}</strong>`}</div>
+       <!-- v85：上一行結尾是「現在總共**賺**」，下一行的大字又是「賺 61.4 萬元」，
+            連著讀就變成「總共賺　賺 61.4 萬元」。標題不要先把動詞講掉。 -->
+       <div class="text-[14px] text-slate-300 mb-1">${state.privacy ? '隱私模式開啟中，金額已隱藏' : `你這 ${real.length} 檔股票，到今天為止——`}</div>
        <!-- 大字用口語版（「賺 75.8 萬元」比「賺 757,740 元」好記，也不會在窄螢幕斷行），
             準確到個位數的金額放第二行。 -->
        <div class="${big} ${state.privacy ? 'text-slate-400' : col} leading-tight">${SENS(word + ' ' + (Math.abs(amt) >= 1e5 ? wanPhrase(amt) : abs(amt) + ' 元'))}</div>
-       <div class="text-[15px] ${state.privacy ? 'text-slate-400' : col} mt-1">${SENS(Math.abs(amt) >= 1e5 ? ('準確金額是 ' + abs(amt) + ' 元') : ('也就是 ' + word + ' ' + wanPhrase(amt)))}<span class="text-slate-400 text-[14px] ml-2">（${SENS(pct(p))}）</span></div>
-       <div class="text-[12px] text-slate-400 mt-2 tabular-nums">買進時共花 ${SENS(abs(cost))} 元．現在值 ${SENS(abs(mv))} 元</div>
+       <div class="text-[15px] ${state.privacy ? 'text-slate-400' : col} mt-1">${SENS(Math.abs(amt) >= 1e5 ? ('準確金額是 ' + abs(amt) + ' 元') : ('也就是 ' + word + ' ' + wanPhrase(amt)))}${extra ? '' : `<span class="text-slate-400 text-[14px] ml-2">（${SENS(pct(p))}）</span>`}</div>
+       <div class="text-[12px] text-slate-400 mt-2 tabular-nums">手上這些花了 ${SENS(abs(cost))} 元．現在值 ${SENS(abs(mv))} 元</div>
+       ${extra ? `<div class="text-[13px] text-slate-300 mt-2 leading-relaxed">這個數字是三筆加起來：還沒賣的 <strong class="tabular-nums">${SENS(signedMoney(unreal))}</strong>${realized!==0?`　＋　已經賣掉賺的 <strong class="tabular-nums">${SENS(signedMoney(realized))}</strong>`:''}${divc>0?`　＋　領到的現金股利 <strong class="tabular-nums">${SENS(signedMoney(divc))}</strong>`:''}。</div>` : ''}
        ${real.some(s=>s.data.adjusted) ? `<div class="text-[12px] text-slate-500 mt-1">均線與歷史統計已還原除權息（${real.filter(s=>s.data.adjusted).length}／${real.length} 檔取得官方除權息資料）。</div>` : ''}
      </div>` +
     /* 舊版把這一塊常駐在首屏第二格：一個 78 歲的使用者剛看到「賠 103 萬」，往下滑一格
@@ -6003,11 +6354,29 @@ function renderBlockC(){
 }
 
 const FS_LEVELS = ['sm','mid','big'];
+/* v85：表格塞不下時，畫面上必須看得出「右邊還有東西」。
+   實測 1280 ＋ 字級「大」：右邊 110px 被切掉，而頁面層級沒有捲軸，
+   使用者只會覺得「操作那一欄不見了」。 */
+function markScrollable(){
+  document.querySelectorAll('.tblwrap').forEach(w=>{
+    const need = w.scrollWidth > w.clientWidth + 2;
+    w.classList.toggle('can-scroll-x', need);
+    let hint = w.parentElement && w.parentElement.querySelector(':scope > .scroll-hint');
+    if(need && !hint && w.parentElement){
+      hint = document.createElement('div');
+      hint.className = 'scroll-hint text-[12px] text-amber-300/90 mt-1';
+      hint.textContent = '← 這張表比畫面寬，右邊還有「操作」等欄位，可以左右滑動查看。';
+      w.parentElement.insertBefore(hint, w.nextSibling);
+    }
+    if(hint) hint.style.display = need ? 'block' : 'none';
+  });
+}
 function applyFontScale(){
   const v = FS_LEVELS.includes(state.fontScale) ? state.fontScale : 'sm';
   state.fontScale = v;
   if(v === 'sm') document.documentElement.removeAttribute('data-fs');
   else document.documentElement.setAttribute('data-fs', v);
+  setTimeout(markScrollable, 60);
   document.querySelectorAll('[data-fs-set]').forEach(b=>{
     const on = b.getAttribute('data-fs-set') === v;
     /* v64：選中的字級用跟 .btn-primary 同一個綠（#10b981），不要再多一個 emerald-600。
@@ -6075,7 +6444,11 @@ function runBlackSwan(){
         x:{ ticks:{color:'#64748b',maxTicksLimit:8,font:{size:10}}, grid:{color:'rgba(51,65,85,.2)'} },
         /* 舊版的右軸股息流是 33 倍比例尺，把一條等於市值 3.5% 的線畫在市值線「上面」，
            Lie Factor = 32.9。註腳自己寫「不應與市值相加」，卻用一行 11px 去對抗一個 33 倍的視覺誤導。 */
-        y:{ beginAtZero:true, ticks:{color:'#64748b',font:{size:11},callback:v=>(v/1e4).toFixed(0)+' 萬'}, grid:{color:'rgba(51,65,85,.2)'} }
+        /* v85：隱私模式只遮 HTML 文字，Chart.js 的座標軸畫在 canvas 上，遮不到。
+           實測開了隱私模式，圖上的文字都是 •••••，Y 軸刻度卻仍是「0 萬／2000 萬／…」，
+           曲線起點落在哪一格一目了然——資產規模直接可讀。截圖給家人看時這是最大的漏洞。 */
+        y:{ beginAtZero:true, ticks:{color:'#64748b',font:{size:11},
+             callback:v=> state.privacy ? '' : (v/1e4).toFixed(0)+' 萬'}, grid:{color:'rgba(51,65,85,.2)'} }
       } }
   });
 
@@ -6262,7 +6635,11 @@ function saveBroker(){
 }
 function renderBrokerBtn(){
   const b = $('brokerBtn'); if(!b) return;
-  b.textContent = state.brokerTel ? `打給${state.brokerName || '營業員'}　${state.brokerTel}` : '設定營業員電話';
+  /* v85：隱私模式是「把畫面拿給家人看」時用的，而這顆按鈕上就印著姓名與電話。
+     號碼本身不是財務資料，但它是個資，而且截圖一定帶出去。遮起來，功能不變（照樣打得出去）。 */
+  b.textContent = !state.brokerTel ? '設定營業員電話'
+    : state.privacy ? '打給我的營業員'
+    : `打給${state.brokerName || '營業員'}　${state.brokerTel}`;
 }
 function onBrokerClick(){
   if(state.brokerTel){ location.href = 'tel:' + state.brokerTel.replace(/[^\d+#*,;]/g,''); return; }
@@ -6930,6 +7307,10 @@ function persist(){
       }
       else throw e1;
     }
+    /* 記下「這個分頁自己寫進去的那一刻」。storage 事件要靠它分辨
+       「別的分頁寫的」與「自己寫的」——lastSaved 是 Date 物件，
+       跟快照裡的 ISO 字串不能直接比，比了會永遠不相等。 */
+    try{ state.lastSavedISO = JSON.parse(window.localStorage.getItem(STORE_KEY)).savedAt || null; }catch(_){ state.lastSavedISO = null; }
     state.lastSaved = new Date();
     state.saveError = null; state._saveWarned = false;
   }catch(e){
@@ -6946,7 +7327,7 @@ function applySnapshot(o, opts={}){
 
   // 先驗證再動手，避免半途失敗把現有清單毀掉
   const clean = [];
-  let skipped = 0, badFmt = 0;
+  let skipped = 0, badFmt = 0, txnDropped = 0;
   for(const w0 of o.watch){
    try{
     const w = w0;
@@ -6978,7 +7359,15 @@ function applySnapshot(o, opts={}){
          「先驗證再動手」的那份 clean 副本裡被靜默丟掉，還原之後只剩
          migrateToTxns 用 cost/shares 重建的一筆買進——已實現損益歸零，
          而畫面完全不會說有東西不見了。 */
-      txns: Array.isArray(w.txns) ? w.txns.slice(0,500).map(sanitizeTxn).filter(Boolean) : null,
+      /* v87：被 sanitizeTxn 丟掉的紀錄以前是**完全靜默**的——沒有計數、沒有提示。
+         那正是「存得進去、讀不回來」最後一哩：使用者只會發現數字自己歸零。
+         現在數出來，讓還原流程可以講出「有 N 筆格式異常被略過」。 */
+      txns: Array.isArray(w.txns) ? (()=>{
+        const src = w.txns.slice(0,500);
+        const ok = src.map(sanitizeTxn).filter(Boolean);
+        if(ok.length < src.length) txnDropped += (src.length - ok.length);
+        return ok;
+      })() : null,
       txnHide: Array.isArray(w.txnHide) ? w.txnHide.filter(x=>typeof x==='string' && x.length<64).slice(0,200) : [],
       cost: (cost != null && isFinite(cost) && cost > 0) ? Math.min(cost, 1e7) : 0,
       costAsOf: (typeof w.costAsOf === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(w.costAsOf)) ? w.costAsOf : null,
@@ -7067,6 +7456,7 @@ function applySnapshot(o, opts={}){
   }
   state.page = 1; state.selected = null;
   state.lastImportSkipped = skipped;
+  state.lastTxnDropped = txnDropped;
   state.lastRestoredData = restoredData;
   state.lastImportBadFmt = badFmt;
   return restored;
@@ -7359,7 +7749,9 @@ function setPrivacy(on, opts){
 /* ══════════════════════════════════════════════════════════════
    14. 事件綁定與初始化
    ══════════════════════════════════════════════════════════════ */
-function renderAll(){ renderMyPnl(); renderMyRule(); renderBrokerBtn(); renderTable(); renderTargetSection(); renderT100(); renderBlockB(); renderBlockC(); }
+function renderAll(){ renderMyPnl(); renderMyRule(); renderBrokerBtn(); renderTable(); renderTargetSection(); renderT100(); renderBlockB(); renderBlockC();
+  /* 表格內容改變之後，「塞不塞得下」也會變——每次重繪都重算一次。 */
+  try{ setTimeout(markScrollable, 60); }catch(e){} }
 
 function initWatchlist(){
   state.watchlist = TOP100.map(([id,name,ind])=>{
@@ -7907,6 +8299,18 @@ function addStock(){
   const name = $('newName').value.trim() || ('自選 ' + id);
   const msg = $('addMsg');
   if(!/^\d{4,6}[A-Z]?$/.test(id)){ msg.className='text-[11px] mt-2 text-rose-400'; msg.textContent='請輸入正確的台股代號（4～6 碼數字，例如 2330）。'; return; }
+  /* v87：跟 txnAdd 同一組上限。1e308 會讓 cost 變 Infinity，
+     首屏印「賠 ∞ 元」而 🐊 停損警示同時顯示「0 檔」（NaN < −15 是 false）——
+     一個荒謬的數字配一個安靜的警示，是最糟的組合。 */
+  if($('newCost').value.trim() && !isFinite(cost)){
+    msg.className='text-[11px] mt-2 text-rose-400'; msg.textContent='成本價不是一個有效的數字。'; return; }
+  if(cost > TXN_MAX_PRICE){
+    msg.className='text-[11px] mt-2 text-rose-400';
+    msg.textContent = `成本價不能超過 ${TXN_MAX_PRICE.toLocaleString('zh-TW')} 元／股。這一格要填「一股」的價格，不是總金額。`;
+    return; }
+  if(!isFinite(shares) || shares > TXN_MAX_SHARES){
+    msg.className='text-[11px] mt-2 text-rose-400';
+    msg.textContent = `股數不能超過 ${TXN_MAX_SHARES.toLocaleString('zh-TW')} 股。`; return; }
   /* v57：舊版成本價必填，於是一位「先生留下來的，不知道多少錢買的」使用者
      不編一個假數字就進不去——第十三輪的 71 歲實測者在第 40 秒因為這行紅字關掉。
      成本價現在可以留白：先把股票加進來，之後在交易紀錄頁慢慢補。 */
@@ -8016,7 +8420,13 @@ function renderTxnPage(){
        手續費與證交稅在 positionOf 裡一直有算（feePaid／taxPaid），但從來沒印出來過。
        現在一筆一筆攤開：先列成交額，再列扣項，最後才是戶頭真正的進出。 */
     if(t.kind === 'buy' || t.kind === 'sell'){
-      const n = +t.shares || 0, amt = n * (+t.price || 0);
+      /* v87：這裡自己重算了一次手續費與證交稅，用的是 t.shares 原值；
+         但帳本 positionOf 用的是 sellN = Math.min(n, shares)（賣超過持有時會截斷）。
+         於是同一頁上：這一列印「戶頭實收 597,345」，上方彙總卻是「已經賣掉的部分 賺 98,972」，
+         而使用者正是拿這一行去對券商交割單。差 398,230 元。
+         改成用帳本實際採用的股數（t._usedShares，由 positionOf 標回來）。 */
+      const n = (t._usedShares != null ? t._usedShares : (+t.shares || 0)), amt = n * (+t.price || 0);
+      const asked = +t.shares || 0;
       const f   = (t.fee != null ? +t.fee : txnFee(amt));
       const tax = t.kind === 'sell' ? (t.tax != null ? +t.tax : Math.round(amt * txnTaxRate(s.id))) : 0;
       const net = t.kind === 'sell' ? amt - f - tax : amt + f;
@@ -8024,6 +8434,7 @@ function renderTxnPage(){
         + `<div class="text-[13px] text-slate-500 leading-snug mt-0.5">`
         +   `手續費 ${money(f)}${t.kind === 'sell' ? `　證交稅 ${money(tax)}` : ''}`
         +   `<br><span class="text-slate-300">${t.kind === 'sell' ? '戶頭實收' : '戶頭實付'} ${money(net)}</span>`
+        +   (asked > n ? `<br><span class="text-amber-300">你記的是 ${shx(asked)}，但照前面的紀錄當時只有 ${shx(n)}，所以上面是照 ${shx(n)} 算的。</span>` : '')
         + `</div>`;
     }
     else if(t.kind === 'div')    detail = `每股 ${pxs(t.price)} 元`;
@@ -8156,6 +8567,16 @@ function txnAdd(){
   if(kind !== 'div' && !(n >= 1)){ txnErr('請填至少 1 股。1 張＝1000 股。'); return; }
   if(needPrice && !(px > 0)){
     txnErr(kind === 'div' ? '請填「每股配多少錢」，例如 4.5。' : '請填大於 0 的價格。'); return; }
+  /* v87：以前這裡沒有上限，但還原端有（TXN_MAX_PRICE）。
+     結果是「存得進去、讀不回來」：畫面說已存好，重新整理之後整筆消失。
+     最常見的填法錯誤就是把「總投入 50 萬」填進「每股多少錢」。 */
+  if(needPrice && !isFinite(px)){ txnErr('價格不是一個有效的數字。'); return; }
+  if(needPrice && px > TXN_MAX_PRICE){
+    txnErr(`每股價格不能超過 ${TXN_MAX_PRICE.toLocaleString('zh-TW')} 元。`
+         + `你填的是 ${px.toLocaleString('zh-TW')}——`
+         + `是不是把「總共花了多少錢」填到「每股多少錢」了？這一格要填**一股**的價格。`); return; }
+  if(!isFinite(n) || n > TXN_MAX_SHARES){
+    txnErr(`股數不能超過 ${TXN_MAX_SHARES.toLocaleString('zh-TW')} 股。`); return; }
   /* 配股與減資填的是「變成幾股」，不是買賣股數，所以走另一條路。 */
   if(kind === 'stkdiv' || kind === 'reduce'){
     if(!(n >= 1)){ txnErr(kind==='stkdiv' ? '請填「配到之後總共變成幾股」。' : '請填「減資之後剩下幾股」。'); return; }
@@ -8423,6 +8844,27 @@ bootAutoConnect()
   .catch(e=>{ console.error('bootAutoConnect failed:', e); })
   .finally(()=>{ state._booting = false; });
 
+/* v87：同一個瀏覽器開兩個分頁時，舊分頁的 persist() 會整份蓋掉新分頁剛存的資料，
+   而兩邊都寫著「已自動儲存」。實測分頁 B 記的一筆 60 萬買進，被分頁 A 的
+   一次翻頁動作抹掉，分頁 B 畫面上「已自動儲存 11:20」還在。
+   localStorage 的 storage 事件只會送到**其他**分頁，正好拿來偵測這件事。 */
+window.addEventListener('storage', e=>{
+  if(!e || e.key !== STORE_KEY || !e.newValue) return;
+  try{
+    const o = JSON.parse(e.newValue);
+    if(!o || !o.savedAt) return;
+    if(state.lastSavedISO && o.savedAt <= state.lastSavedISO) return;   // 是自己寫的，或更舊
+    state.autoSave = false;                                        // 先止血：別讓這個分頁再蓋回去
+    updateSaveStatus();
+    showModal({ icon:'⚠️', title:'這份資料在另一個分頁被改過了',
+      body:`你在<strong>另一個分頁</strong>（或另一個視窗）改了自選清單，那邊已經存檔。<br>
+            這個分頁上的內容是舊的——如果繼續在這裡操作，會把那邊的變更蓋掉。<br><br>
+            <strong>已經先暫停這個分頁的自動儲存</strong>，你的另一份資料是安全的。`,
+      actions:`<button onclick="location.reload()" class="flex-1 py-2 rounded-lg text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-900">重新載入最新的</button>`
+             + `<button onclick="closeModal()" class="flex-1 py-2 rounded-lg text-xs bg-slate-700 hover:bg-slate-600">先不要</button>` });
+  }catch(err){}
+});
+
 /* 網路回來、或分頁重新回到前景時，立刻試一次重連（不等退避計時器） */
 window.addEventListener('online', ()=>{ if(state.token && !state.live && !state._loggedOut){ cancelReconnect(); silentReverify(); } });
 window.addEventListener('offline', ()=>{ if(state.live) degradeConnection(new ApiError('這台裝置目前沒有網路連線','offline','網路恢復後會自動重連。')); });
@@ -8448,6 +8890,17 @@ setInterval(()=>{
   }catch(e){}
 }, 30000);
 scheduleSessionNotice();
+/* v87：被丟掉的交易紀錄以前是靜默的——使用者只會看到金額自己歸零。
+   這是資料遺失，必須用擋路的方式講，不能只是一則會自己消失的提示。 */
+if(state.lastTxnDropped > 0){
+  showModal({ icon:'⚠️', title:`有 ${state.lastTxnDropped} 筆交易紀錄讀不回來`,
+    body:`從這台裝置載回資料時，有 <strong>${state.lastTxnDropped} 筆</strong>交易紀錄的內容超出可接受的範圍，
+          已經略過沒有載入——最常見的原因是<strong>把「總共花了多少錢」填到「每股多少錢」那一格</strong>
+          （每股價格上限是 ${TXN_MAX_PRICE.toLocaleString('zh-TW')} 元）。<br><br>
+          受影響那幾檔的成本與損益會不正確。請按該列的「交易紀錄」重新補上，
+          這一次「每股多少錢」請填<strong>一股</strong>的價格。`,
+    actions:`<button onclick="closeModal()" class="flex-1 py-2 rounded-lg text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-900">我知道了</button>` });
+}
 if(restoredCount > 0){
   toast(`已從本機自動載回 ${restoredCount} 檔自選標的${state.lastRestoredData ? `，其中 ${state.lastRestoredData} 檔帶有上次的價格（標示為「舊資料」）` : ''}。`, 'ok');
 } else if(HAS_STORE){
