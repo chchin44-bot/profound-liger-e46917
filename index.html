@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#080b12">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src https:; form-action 'none'; base-uri 'none'; frame-ancestors 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src https://api.finmindtrade.com; form-action 'none'; base-uri 'none'">
+<!-- frame-ancestors 放在 <meta> 裡瀏覽器一律忽略，只會在每次載入時吐一行主控台警告，
+     把真正的錯誤淹掉。它需要 HTTP 標頭，而 GitHub Pages 給不了——留著是假的防線。 -->
 <meta name="referrer" content="no-referrer">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -166,6 +168,15 @@
   /* 分頁鈕停用時 opacity-40 只有 3.33:1，看不出那是「已停用」還是「壞掉」 */
   .pager-btn.opacity-40, .opacity-40.pointer-events-none{ opacity:.62 !important; }
 
+  /* v88：見上方 statgrid 的說明。窄螢幕兩欄 ＋ 合計獨佔一行。 */
+  @media (max-width: 520px){
+    .statgrid{ grid-template-columns:1fr 1fr !important; }
+    .statgrid > div:last-child{ grid-column:1 / -1; }
+  }
+  /* 數字仍然可能比格子長（金額沒有上限）。讓它縮，不要切掉。 */
+  .statgrid .tabular-nums{ overflow-wrap:anywhere; }
+  #totalPnl{ font-size:clamp(15px, 5.2vw, 22px); line-height:1.25; }
+
   .pe-note{ max-width:230px; min-width:180px; margin-left:auto; }
   /* v85：桌機 1280 ＋ 字級「大」時，表格 scrollWidth 1322 > clientWidth 1212，
      右邊 110px 被切掉，「操作」整欄看不到——而且頁面層級沒有橫向捲軸，
@@ -292,7 +303,7 @@
   .fs-btn{ min-width:48px !important; min-height:48px !important; font-size:15px !important; }
   .fs-on{ background:#10b981; color:#0f172a; font-weight:700; }
   /* 純文字的收合開關是整列可點，寬度已足，只補高度 */
-  #tokenCollapse, #advToggle, #helpToggle{ min-height:44px; }
+  #tokenCollapse, #helpToggle{ min-height:44px; }
   /* checkbox 本身不能被 min-height 撐歪，用外距擴大命中區 */
   input[type="checkbox"]{ width:22px; height:22px; }
 
@@ -768,7 +779,7 @@
            起因是很實際的一件事：改好的東西部署上去之前，畫面上完全看不出手上這份是哪一版，
            使用者以為沒改、我以為改了，兩邊各講各的。這一行由 build.sh 在建置時填入，
            不可能寫錯，也不會忘了更新。 -->
-      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v87 · 2026-08-18 19:42</span>
+      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v88 · 2026-08-18 21:25</span>
     </div>
 
     <!-- 設定：預設收合。裡面是 Token、登出、診斷、隱私、說明、示範資料、資料儲存、進階設定。 -->
@@ -1158,7 +1169,11 @@
         <span class="sec-bar"></span>需要注意的事
       </h2>
       <p class="text-[11px] text-slate-400 mb-3">借錢比例 = 總負債 ÷ 總資產（金融／租賃業不適用，它們天生就是 85～95%）。超過 <span id="rhinoHiTxt">80%</span> 會列在這裡（<span id="rhinoMidTxt">60～80%</span> 標「偏高」）；賠超過 <span id="crocTxt">−15%</span> 也會列在這裡。</p>
-      <div class="grid grid-cols-3 gap-2 mb-3">
+      <!-- v88：390px 螢幕上三欄各只有約 104px，而「全部合計」那格放的是整份持倉的金額。
+           實測 −12,278,142 元 比格子寬 14px，數字被切掉——使用者說「右邊的格子會重疊」。
+           窄螢幕改成兩欄：上排放兩個計數（本來就只是個位數），
+           「全部合計」獨佔整行——它是這一區最重要的數字，也是最長的。 -->
+      <div class="statgrid grid grid-cols-3 gap-2 mb-3">
         <div class="bg-slate-900/60 rounded-lg p-2.5 border border-slate-700/40">
           <div class="text-[12px] text-slate-400 leading-snug">借錢超過 <span id="rhinoHiTxt2">80%</span> 的</div>
           <div id="rhinoCount" class="text-xl font-bold text-orange-300 tabular-nums">0</div>
@@ -6231,7 +6246,7 @@ function renderMyPnl(){
        <div class="${big} ${state.privacy ? 'text-slate-400' : col} leading-tight">${SENS(word + ' ' + (Math.abs(amt) >= 1e5 ? wanPhrase(amt) : abs(amt) + ' 元'))}</div>
        <div class="text-[15px] ${state.privacy ? 'text-slate-400' : col} mt-1">${SENS(Math.abs(amt) >= 1e5 ? ('準確金額是 ' + abs(amt) + ' 元') : ('也就是 ' + word + ' ' + wanPhrase(amt)))}${extra ? '' : `<span class="text-slate-400 text-[14px] ml-2">（${SENS(pct(p))}）</span>`}</div>
        <div class="text-[12px] text-slate-400 mt-2 tabular-nums">手上這些花了 ${SENS(abs(cost))} 元．現在值 ${SENS(abs(mv))} 元</div>
-       ${extra ? `<div class="text-[13px] text-slate-300 mt-2 leading-relaxed">這個數字是三筆加起來：還沒賣的 <strong class="tabular-nums">${SENS(signedMoney(unreal))}</strong>${realized!==0?`　＋　已經賣掉賺的 <strong class="tabular-nums">${SENS(signedMoney(realized))}</strong>`:''}${divc>0?`　＋　領到的現金股利 <strong class="tabular-nums">${SENS(signedMoney(divc))}</strong>`:''}。</div>` : ''}
+       ${extra ? `<div class="text-[13px] text-slate-300 mt-2 leading-relaxed">這個數字是三筆加起來：還沒賣的 <strong class="tabular-nums">${SENS(signedMoney(unreal))}</strong>${realized!==0?`　＋　已經賣掉的部分 <strong class="tabular-nums">${SENS(signedMoney(realized))}</strong>`:''}${divc>0?`　＋　領到的現金股利 <strong class="tabular-nums">${SENS(signedMoney(divc))}</strong>`:''}。</div>` : ''}
        ${real.some(s=>s.data.adjusted) ? `<div class="text-[12px] text-slate-500 mt-1">均線與歷史統計已還原除權息（${real.filter(s=>s.data.adjusted).length}／${real.length} 檔取得官方除權息資料）。</div>` : ''}
      </div>` +
     /* 舊版把這一塊常駐在首屏第二格：一個 78 歲的使用者剛看到「賠 103 萬」，往下滑一格
@@ -6304,9 +6319,16 @@ function renderBlockC(){
   const rhino = loaded.filter(s=>s.data.debt>RHINO_HI && !isFinancial(s.ind, s.id) && !isHighDebtIndustry(s.ind)).length;
   const rhinoWarn = loaded.filter(s=>s.data.debt>RHINO_MID && s.data.debt<=RHINO_HI && !isFinancial(s.ind, s.id) && !isHighDebtIndustry(s.ind)).length;
   const croc  = loaded.filter(s=>s.data.pnl!=null && s.data.pnl<-15).length;
-  $('rhinoCount').textContent = rhino;
-  const rw = $('rhinoWarn'); if(rw) rw.textContent = rhinoWarn ? `另有 ${rhinoWarn} 檔在 60～80% 之間（偏高）` : '';
-  $('crocCount').textContent = croc;
+  /* v88：隱私模式在表格裡把每一列的動物換成 🕶，這裡卻照樣印「🦏 2 檔」「🐊 3 檔」——
+     同一件事在同一頁上一個遮、一個不遮，而這兩個數字正是把表格逐列還原出來的摘要。
+     實測開了隱私模式截圖，位階全是 •••••，區塊 C 仍寫著「負債過高 2 檔／已經跌很多 3 檔」。
+     這裡跟 renderTable 收斂到同一條規則。 */
+  $('rhinoCount').innerHTML = SENS(String(rhino));
+  const rw = $('rhinoWarn');
+  if(rw){
+    rw.innerHTML = rhinoWarn ? `另有 ${SENS(String(rhinoWarn))} 檔在 60～80% 之間（偏高）` : '';
+  }
+  $('crocCount').innerHTML = SENS(String(croc));
   const excluded = all.length - loaded.length;
   const cq = $('blockCQuality');
   if(cq){
@@ -6346,7 +6368,7 @@ function renderBlockC(){
     if(extra){
       br.className = 'mt-2 rounded-lg border border-slate-600/50 bg-slate-900/50 p-2.5 text-[13px] text-slate-300 leading-relaxed';
       br.innerHTML = SENS(`「全部合計」是這三筆加起來：還沒賣的 <strong class="tabular-nums">${signedMoney(unreal)}</strong>`
-        + `　＋　已經賣掉賺的 <strong class="tabular-nums">${signedMoney(realized)}</strong>`
+        + `　＋　已經賣掉的部分 <strong class="tabular-nums">${signedMoney(realized)}</strong>`
         + (divc>0 ? `　＋　領到的現金股利 <strong class="tabular-nums">${signedMoney(divc)}</strong>` : '')
         + `。<br>手續費與證交稅已經分別扣在前兩筆裡了，不會重複扣。`);
     } else { br.className = 'hidden'; br.innerHTML = ''; }
@@ -6439,7 +6461,13 @@ function runBlackSwan(){
         { label: draw ? '崩跌 −50% 且持續提領' : '崩跌 −50% 但持續扣款', data:crash.map(v=>Math.round(v)), borderColor: draw ? '#fb7185' : '#34d399', backgroundColor: draw ? 'rgba(251,113,133,.12)' : 'rgba(52,211,153,.12)', borderWidth:2.5, pointRadius:0, fill:true, tension:.25 }
       ]},
     options:{ responsive:true, maintainAspectRatio:true, interaction:{mode:'index',intersect:false},
-      plugins:{ legend:{ labels:{ color:'#94a3b8', boxWidth:12, font:{size:10} } } },
+      /* v88：v85 只把 Y 軸刻度遮掉，卻沒有遮 tooltip。
+         實測隱私模式開著、手指按在圖上第 0 年 → 浮出「沒有崩跌: 9,200,000」，
+         那就是整個投資組合的市值，一個字都沒少。遮了刻度卻留著 tooltip，
+         等於把門鎖上、窗戶開著。三條線與 Y 軸收斂到同一道閘門。 */
+      plugins:{ legend:{ labels:{ color:'#94a3b8', boxWidth:12, font:{size:10} } },
+                tooltip:{ backgroundColor:'#0f172a', borderColor:'#334155', borderWidth:1,
+                  callbacks:{ label: c => (c.dataset.label||'') + '：' + (state.privacy ? '•••••' : c.formattedValue) } } },
       scales:{
         x:{ ticks:{color:'#64748b',maxTicksLimit:8,font:{size:10}}, grid:{color:'rgba(51,65,85,.2)'} },
         /* 舊版的右軸股息流是 33 倍比例尺，把一條等於市值 3.5% 的線畫在市值線「上面」，
@@ -6698,7 +6726,11 @@ function answerQuiz(i, ans){
    ══════════════════════════════════════════════════════════════ */
 function showModal({icon,title,body,actions}){
   $('modalIcon').textContent = icon;
-  $('modalTitle').innerHTML = title;
+  /* v88：標題以前走 innerHTML，安全與否完全靠「每個呼叫端都記得先 esc()」——
+     而這個專案十一輪來的招牌缺陷，正是「同一件事有 N 個呼叫端，其中一個忘了」。
+     實地清查目前 32 個 title 沒有一個需要 HTML（粗體全在 body 裡），
+     所以改成 textContent，把這條路直接封死。 */
+  $('modalTitle').textContent = title;
   $('modalBody').innerHTML = body;
   $('modalActions').innerHTML = actions;
   const m = $('modal'); m.classList.remove('hidden'); m.classList.add('flex'); syncModalOpen();
@@ -7183,8 +7215,12 @@ function snapshot(lean, opts){
     privacy: state.privacy,
     fontScale: state.fontScale,
     secOpen: state.secOpen,
-    myRule: state.myRule, myRuleAt: state.myRuleAt,
-    myRulePending: state.myRulePending, myRulePendingAt: state.myRulePendingAt,
+    /* v88：這四個欄位匯入端**從來不還原**（applySnapshot 只在 trusted 分支讀它們，
+       而匯入一律是非 trusted）。所以放進匯出檔只有出、沒有回——
+       純粹是把一句很私人的話（「等我孫子上大學再賣」這種）寫進一個會躺在 Downloads、
+       會被寄給家人的檔案裡，換不到任何還原能力。跟 Token、券商電話同一處理。 */
+    myRule: forExport ? '' : state.myRule, myRuleAt: forExport ? '' : state.myRuleAt,
+    myRulePending: forExport ? '' : state.myRulePending, myRulePendingAt: forExport ? '' : state.myRulePendingAt,
     brokerName: forExport ? '' : state.brokerName, brokerTel: forExport ? '' : state.brokerTel,
     watch: state.watchlist.filter(x=>x.inWatch).map(x=>{
       const o = { id:x.id, name:x.name, ind:x.ind, cost:x.cost, shares:x.shares, type:x.type,
@@ -7439,7 +7475,12 @@ function applySnapshot(o, opts={}){
     state.myRulePending = txt(o.myRulePending, 200); state.myRulePendingAt = txt(o.myRulePendingAt, 10);
     state.brokerName = txt(o.brokerName, 40); state.brokerTel = txt(o.brokerTel, 30);
   }else if(HAS_STORE && !state.autoSave){
-    state.autoSave = true;     // 匯入這個動作本身就代表使用者要留下這份資料
+    /* 匯入這個動作本身就代表使用者要留下這份資料，所以自動儲存跟著打開。
+       v88：但這件事以前是**靜默**發生的——使用者刻意把自動儲存關掉（不想在這台
+       裝置的硬碟上留下成本價），匯入一次備份檔就被默默改回開啟並立刻寫入 localStorage，
+       畫面上只有面板深處一行 10px 灰字會變。改成記下來，在匯入完成的提示裡明講。 */
+    state.autoSave = true;
+    state.lastImportTurnedOnAutoSave = true;
   }
   // 安全性：proxy 與 rememberToken 一律不從備份檔還原（備份檔可能來自他人，
   // 靜默設定代理等於把 Token 導向第三方伺服器）。只有本機自己存的快照才套用。
@@ -7575,7 +7616,7 @@ function exportBackup(){
     document.body.appendChild(a); a.click();
     setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 1000);
     /* 匯出的東西是什麼，使用者當下就要知道——不能只寫在面板底部的 11px 灰字裡。 */
-    toast('備份檔已下載。裡面有你的成本價、張數與每一筆買賣紀錄，但**沒有** Token、也沒有券商電話。要傳給別人之前請先想一下。','warn');
+    toast('備份檔已下載。裡面有你的成本價、張數與每一筆買賣紀錄；**沒有** Token、沒有券商電話，也沒有你自己寫的那句規則（那句話只留在這台裝置上）。要傳給別人之前請先想一下。','warn');
   }catch(e){
     // 沙盒可能封鎖下載 —— 改成讓使用者手動複製
     showModal({ icon:'📋', title:'請手動複製備份內容',
@@ -7604,7 +7645,8 @@ function handleImportFile(file){
               <div class="bg-slate-800/60 rounded p-2"><div class="text-[10px] text-slate-400">備份時間</div><div class="text-[11px] font-bold text-slate-200">${esc(when)}</div></div>
             </div>
             <div class="mt-2 text-[10px] text-slate-400 leading-relaxed">
-              基於安全考量，備份檔中的 <strong>Token</strong> 與 <strong>API 代理設定</strong>不會被套用；格式不合法的股票代號會被略過。
+              基於安全考量，備份檔中的 <strong>Token</strong>、<strong>你自己寫的那句規則</strong>與<strong>券商姓名電話</strong>都不會被套用（別人的檔案不該在你的畫面上寫字、也不該改掉你要打的電話）；格式不合法的股票代號會被略過。<br>
+              如果你把「自動儲存」關著，匯入會把它打開，這份資料就會存進這台裝置。
             </div>`,
       actions:`<button data-conf="importCancel" class="flex-1 py-2 rounded-lg text-xs bg-slate-700 hover:bg-slate-600">取消</button>
                <button data-conf="importGo" class="flex-1 py-2 rounded-lg text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-900">確認取代</button>` });
@@ -7616,6 +7658,7 @@ function handleImportFile(file){
 function doImport(){
   const parsed = state.pendingImport;
   state.pendingImport = null;
+  state.lastImportTurnedOnAutoSave = false;
   closeModal();
   if(!parsed) return;
   try{
@@ -7624,7 +7667,11 @@ function doImport(){
     persist();
     const sk = state.lastImportSkipped;
     const bf = state.lastImportBadFmt;
-    toast(`已從備份檔還原 ${n} 檔自選標的${sk?`（略過 ${sk} 筆格式不合法的資料）`:''}。Token 與代理設定未套用。`, 'ok');
+    toast(`已從備份檔還原 ${n} 檔自選標的${sk?`（略過 ${sk} 筆格式不合法的資料）`:''}。備份檔裡的 Token 不會被套用；你自己寫的那句規則與券商電話也不會被別人的檔案覆蓋。`, 'ok');
+    if(state.lastImportTurnedOnAutoSave){
+      state.lastImportTurnedOnAutoSave = false;
+      toast('⚠ 你原本把「自動儲存」關著，匯入已經把它打開，這份資料現在會存在這台裝置上。不想留在這台裝置的話，到「💾 資料儲存」把它關掉。','warn');
+    }
     if(bf) toast(`⚠ 其中 ${bf} 個成本價或股數的格式無法辨識（例如帶了逗號或「元」字），已當成未填寫。請檢查備份檔或用 ✏️ 重新輸入。`, 'warn');
   }catch(e){ toast('匯入失敗：' + e.message, 'err'); }
 }
@@ -7742,8 +7789,18 @@ function setPrivacy(on, opts){
       (on ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-900' : 'bg-slate-700/70 hover:bg-slate-600 text-slate-200');
     t.textContent = on ? '隱私模式：開' : '隱私模式';
   }
+  /* v88：Token 欄位按過「顯示」之後就永遠是明文——連開隱私模式都不會把它收回去。
+     隱私模式的用途正是「要把畫面給別人看／截圖」，而這一格是全頁最敏感的東西。 */
+  if(on) hideTokenField();
   if(opts && opts.quiet) return;
   try{ renderAll(); }catch(e){}
+}
+
+/* 把 Token 欄位收回遮蔽狀態。開隱私模式、收起設定區、驗證成功之後都要呼叫——
+   否則「顯示」是一個沒有反向動作的單向開關。 */
+function hideTokenField(){
+  const i = $('tokenInput'); if(i) i.type = 'password';
+  const t = $('toggleToken'); if(t) t.textContent = '顯示';
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -7818,11 +7875,9 @@ document.addEventListener('click', e=>{
                <button onclick="doClearHoldings()" class="flex-1 py-2 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white">確認清空</button>` });
     return;
   }
-  if(t.id==='advToggle'){
-    const ap=$('advPanel'); ap.classList.toggle('hidden');
-    t.textContent = (ap.classList.contains('hidden')?'▸':'▾') + ' 進階設定：API 代理網址（連線被瀏覽器擋掉時才需要）';
-    return;
-  }
+  /* v88：#advToggle／#advPanel 隨著 v75 移除代理功能一起從 HTML 消失了，
+     這個處理器卻留著——$('advPanel') 會是 null，一旦有人（或未來的我）
+     把那顆按鈕加回來就直接丟例外。連同 CSS 裡的 #advToggle 一起刪掉。 */
   if(t.id==='mockBtn'){
     if(state.demoMode){
       state.demoMode = false; invalidateGeneration();
@@ -8103,6 +8158,9 @@ function setTokenCollapsed(on){
      連線警告（envWarn）刻意留在收合區外，任何時候都看得到。 */
   if(extras) extras.classList.toggle('hidden', !!on);
   if(on){
+    /* v88：收起設定區時把 Token 欄位一起收回遮蔽狀態——不然按過一次「顯示」，
+       它就永遠是明文，下次展開設定區時整串 Token 直接躺在畫面上。 */
+    hideTokenField();
     panel.classList.add('hidden');
     sum.classList.remove('hidden'); sum.classList.add('flex');
     const n = $('tokenInput').value.length;
@@ -8584,8 +8642,13 @@ function txnAdd(){
     const cur = positionOf(s).shares;
     if(!(cur > 0)){ txnErr('要先有買進紀錄，才能記配股或減資。'); return; }
     const ratio = n / cur;
-    if(kind === 'stkdiv' && !(ratio > 1)){ txnErr(`配股之後股數應該變多。你現在有 ${Math.round(cur).toLocaleString('zh-TW')} 股，請填一個比它大的數字。`); return; }
-    if(kind === 'reduce' && !(ratio < 1)){ txnErr(`減資之後股數應該變少。你現在有 ${Math.round(cur).toLocaleString('zh-TW')} 股，請填一個比它小的數字。`); return; }
+    /* v88：隱私模式下這兩句會把持股數講出來（畫面上其他地方都遮著）。
+       但「你現在有幾股」正是使用者填這一格需要的數字，直接遮掉會讓錯誤訊息變成廢話——
+       所以改成：隱私模式下不報數字，改叫他關掉隱私模式看。 */
+    const curTxt = state.privacy ? '（隱私模式，數字已遮住——請先關掉隱私模式查看目前股數）'
+                                 : `你現在有 ${Math.round(cur).toLocaleString('zh-TW')} 股，`;
+    if(kind === 'stkdiv' && !(ratio > 1)){ txnErr(`配股之後股數應該變多。${curTxt}請填一個比它大的數字。`); return; }
+    if(kind === 'reduce' && !(ratio < 1)){ txnErr(`減資之後股數應該變少。${curTxt}請填一個比它小的數字。`); return; }
     s.txns.push({ id:'t'+String(date).replace(/-/g,'')+'_'+(s.txns.length+1)+'_'+kind,
                   kind, date: unknownDate ? '' : date, dateUnknown: unknownDate,
                   shares:0, price: (kind==='reduce' && px > 0) ? px : 0, ratio,
@@ -8678,14 +8741,17 @@ function txnDelete(tid){
   const isAuto = String(tid).startsWith('auto:');
   const lab = t ? (TXN_LABEL[t.kind] || t.kind) : '這一筆';
   const when = t ? (t.dateUnknown ? '日期不詳' : String(t.date||'').slice(0,10)) : '';
-  const detail = (t && (t.kind==='buy'||t.kind==='sell'))
-    ? `${shareText(+t.shares||0)}　每股 ${fmt(t.price,2)} 元` : '';
+  /* v88：這個確認框是全站唯一一個完全沒有跟著隱私模式走的地方——
+     實測隱私模式開著，交易紀錄每一列都是 •••••，但按下「刪掉」跳出來的確認框
+     照樣寫著「2,000 股（2 張）　每股 800.00 元」，把剛剛遮掉的東西又講一次。 */
+  const detailHtml = (t && (t.kind==='buy'||t.kind==='sell'))
+    ? SENS(esc(`${shareText(+t.shares||0)}　每股 ${fmt(t.price,2)} 元`)) : '';
   const rest = (s.txns||[]).filter(x=>x.id!==tid).length;
   showModal({ icon:'🗑️', title: isAuto ? '隱藏這一筆自動紀錄？' : '刪掉這一筆紀錄？',
     body: isAuto
       ? `這是系統依官方除權息／減資資料自動加上的紀錄。隱藏之後，重抓官方資料也不會再出現。<br>
-         <div class="mt-2 rounded-lg bg-slate-900/60 border border-slate-700/50 p-2.5 text-[14px]">${esc(when)}　${esc(lab)}　${esc(detail)}</div>`
-      : `<div class="rounded-lg bg-slate-900/60 border border-slate-700/50 p-2.5 text-[14px] mb-2">${esc(when)}　${esc(lab)}　${esc(detail)}</div>
+         <div class="mt-2 rounded-lg bg-slate-900/60 border border-slate-700/50 p-2.5 text-[14px]">${esc(when)}　${esc(lab)}　${detailHtml}</div>`
+      : `<div class="rounded-lg bg-slate-900/60 border border-slate-700/50 p-2.5 text-[14px] mb-2">${esc(when)}　${esc(lab)}　${detailHtml}</div>
          <strong class="text-amber-300">刪掉之後沒辦法復原。</strong>${rest===0
            ? '<br>這是這一檔<strong>最後一筆</strong>紀錄——刪掉之後，它的成本價與股數會歸零，畫面上就算不出你在這一檔賺賠多少錢了。'
            : `<br>刪掉之後這一檔還剩 ${rest} 筆，成本與損益會重算。`}`,
