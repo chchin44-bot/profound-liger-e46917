@@ -123,7 +123,19 @@
      使用者的原話是「這個說明會不會太遠了」。
      修法不是把句子改成靠右（一整句靠右很難讀），是把它裝進一個有寬度上限的方塊，
      再用 margin-left:auto 把方塊推到數字底下：句子本身仍然靠左讀，但位置跟著數字走。 */
-  .pe-note{ max-width:230px; margin-left:auto; }
+  /* 上限擋住「撐開整欄」，下限擋住「擠成七行細長條」——
+     本益比欄天生只放一個數字，很窄，不給下限的話換行之後會變成一條瘦長的字串。 */
+  .pe-note{ max-width:230px; min-width:180px; margin-left:auto; }
+
+  /* v84：標的欄的第二行原本是「名稱 · 成本 600.82 · 30 股（零股）」擠成一行，
+     而儲存格是 nowrap，於是它只能一路橫著長出去。
+     使用者要求成本與股數分行——這同時也是可讀性的正解：
+     三個不同性質的東西（名字、單價、數量）擠在一行，眼睛要自己切開它們，
+     而這個 app 的使用者有老花。一行一件事。 */
+  /* 不用 .nb —— 那個類別是 inline-block，而且宣告在這之後，會把 block 蓋掉。
+     這三行各自要 nowrap（「成本 600.82」不該斷在中間），但必須是 block。 */
+  .c-name, .c-cost, .c-shares{ display:block; white-space:nowrap; }
+  .c-cost{ margin-top:1px; }
   @media (max-width: 820px){
     /* 手機是卡片式版面，沒有「欄」可以對齊，維持整行寬度比較好讀 */
     .pe-note{ max-width:none; margin-left:0; }
@@ -396,6 +408,14 @@
   }
   .tag { display:inline-flex;align-items:center;gap:.15rem;padding:.1rem .4rem;border-radius:.35rem;font-size:.7rem;line-height:1.1rem;white-space:nowrap; }
   table.fin td, table.fin th { white-space:nowrap; }
+  /* v84：nowrap 是為了**數字**（1,234.5 不該被拆到兩行），不是為了句子。
+     但它同時也讓儲存格裡那些整段的說明文字永遠不換行——
+     實測 1395px 桌機：本益比欄的說明橫著溢出 376px，直接壓在隔壁兩欄的字上面，
+     使用者看到的就是「字都重疊了」。
+     凡是散文區塊都掛 .cell-note，在這裡把換行要回來。
+     r13/overlap.mjs 會掃過每一格，任何內容溢出儲存格 4px 以上就報錯——
+     以後再有人忘記掛這個類別，測試會先發現，不是使用者。 */
+  table.fin td .cell-note{ white-space:normal; }
 
 
   /* ═══════════ 手機版面：卡片排版 ═══════════ */
@@ -578,9 +598,7 @@
                      overflow:hidden; text-overflow:ellipsis; display:block; line-height:44px; }
 
     /* 名稱與成本各佔一行，避免尷尬折行 */
-    .c-name{ display:block; font-size:11px; color:#cbd5e1; }
-    .c-cost{ display:block; margin-top:1px; }
-    .c-sep{ display:none; }
+    .c-name{ font-size:11px; color:#cbd5e1; }
     /* 其他 */
     header{ position:static !important; }
     main{ padding-left:10px !important; padding-right:10px !important; }
@@ -677,7 +695,7 @@
            起因是很實際的一件事：改好的東西部署上去之前，畫面上完全看不出手上這份是哪一版，
            使用者以為沒改、我以為改了，兩邊各講各的。這一行由 build.sh 在建置時填入，
            不可能寫錯，也不會忘了更新。 -->
-      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v83 · 2026-08-18 13:34</span>
+      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v84 · 2026-08-18 15:34</span>
     </div>
 
     <!-- 設定：預設收合。裡面是 Token、登出、診斷、隱私、說明、示範資料、資料儲存、進階設定。 -->
@@ -882,7 +900,7 @@
           <tr class="text-left">
             <th class="px-2.5 py-2 font-medium">類型 / 產業</th>
             <th class="px-2.5 py-2 font-medium">代號 / 名稱</th>
-            <th class="px-2.5 py-2 font-medium text-right">最新收盤</th>
+            <th class="px-2.5 py-2 font-medium text-right">最新價格</th>
             <th class="px-2.5 py-2 font-medium text-right">未實現損益</th>
             <th class="px-2.5 py-2 font-medium text-right">千張大戶變動</th>
             <th class="px-2.5 py-2 font-medium text-right">負債比</th>
@@ -950,6 +968,12 @@
         <option value="na">⚪ 資料不足</option>
         <option value="trap">⚠️ 本益比失真</option>
       </select>
+      <select id="shortFilter" class="cd-in" style="width:auto;min-width:150px" aria-label="依短線位階篩選">
+        <option value="">全部短線位階</option>
+        <option value="oversold">🐆 短線超賣（跌破布林下軌）</option>
+        <option value="overbought">🐱 短線超買（衝上布林上軌）</option>
+        <option value="mid">— 短線中性</option>
+      </select>
       <select id="animalFilter" class="cd-in" style="width:auto;min-width:150px" aria-label="依動物狀態篩選">
         <option value="">全部動物狀態</option>
         <option value="whale">🐋 鯨魚（便宜或大戶增持）</option>
@@ -980,7 +1004,7 @@
           <tr class="text-left">
             <th class="px-2.5 py-2 font-medium">代號 / 名稱</th>
             <th class="px-2.5 py-2 font-medium">產業</th>
-            <th class="px-2.5 py-2 font-medium text-right">最新收盤</th>
+            <th class="px-2.5 py-2 font-medium text-right">最新價格</th>
             <th class="px-2.5 py-2 font-medium text-right">本益比</th>
             <th class="px-2.5 py-2 font-medium text-right">負債比</th>
             <th class="px-2.5 py-2 font-medium text-right">千張大戶變動</th>
@@ -1077,6 +1101,19 @@
 
   <!-- ═══════════ 區塊 D ═══════════ -->
   <section class="glass rounded-2xl p-4 fade-in">
+    <!-- v84：動物圖鑑裝回來。
+         renderLegend() 這個函式一直都在，只是它的容器 #legendGrid 被拿掉了，
+         於是第一行 `if(!$('legendGrid')) return;` 讓它每次都直接跳出——
+         內容改放到說明彈窗的 🦁 分頁，而使用者記得首頁有過，找不到就以為壞了。
+         這次放回來，但預設收合：想看的時候點一下，不想看的時候不佔畫面。 -->
+    <details class="secfold" data-sec="動物圖鑑">
+    <summary class="secsum"><span class="sec-bar"></span><span class="sectitle">動物圖鑑（每一隻代表什麼）</span><span class="foldmore"></span></summary>
+    <div class="secbody">
+    <p class="text-[13px] text-slate-400 mb-3">表格裡出現的每一隻動物都在這裡。<strong class="text-slate-300">成對的兩隻是同一個條件的正反面</strong>，只差方向。</p>
+    <div id="legendGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-3"></div>
+    </div>
+    </details>
+
     <details class="secfold" data-sec="問自己三個問題">
     <summary class="secsum"><span class="sec-bar"></span><span class="sectitle">問自己三個問題</span><span class="foldmore"></span></summary>
     <div class="secbody">
@@ -1207,7 +1244,7 @@ const state = {
   quizGood: {},               // 心理快篩答對取得的正面動物（與 quiz 分開，避免污染計數）
   swanMode: 'add',            // 黑天鵝情境：add＝還在存錢每年投入；draw＝已退休每年提領
   fontScale: 'sm',            // 全頁字級：sm／mid／big，存進本機
-  filter: { q:'', ind:'', holdOnly:false, level:'', animal:'' },   // v79：百大資料庫的篩選條件
+  filter: { q:'', ind:'', holdOnly:false, level:'', animal:'', short:'' },   // v79：百大資料庫的篩選條件（v84 加短線位階）
   openRows: [],               // v68：手機版展開中的股票代號（不進備份檔，換一台裝置就重來）
   /* v78：區塊的開合由使用者決定，而且記住。
      我在 v74 用「不會迷路」當理由把目標價收起來，但那是我的判斷；
@@ -1352,6 +1389,24 @@ function shareText(n){
 function twHM(d){
   try{ return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(d); }
   catch(e){ return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+}
+/* 即時報價的時間戳 → 「13:30」。
+   舊版寫 String(d.rtTime).slice(-8)，假設字串結尾一定是 HH:MM:SS。
+   FinMind 實際回的是 "2026-08-18 13:30:06.992000"（帶微秒），
+   切最後 8 個字剛好切在秒與微秒中間，畫面上就變成「⚡ 即時 6.992000」——
+   一個看起來像股價、其實什麼都不是的數字。使用者因此以為收盤價不是抓 FinMind 的。
+   認不出來就回空字串：徽章少一個時間沒關係，印出一段假數字才是災難。 */
+function rtClock(v){
+  if(v == null) return '';
+  const s = String(v);
+  const m = s.match(/(\d{1,2}):(\d{2})/);
+  if(m) return m[1].padStart(2,'0') + ':' + m[2];
+  const n = +s;                                  // 純數字 ＝ Unix 秒或毫秒
+  if(isFinite(n) && n > 1e9){
+    const d = new Date(n > 1e12 ? n : n * 1000);
+    if(isFinite(d.getTime())) return twHM(d);
+  }
+  return '';
 }
 /* 依有效位數輸出金額。輸入假設只有 1～2 位有效數字時，印出 8 位數是假精確。 */
 /* 給老人家看的金額：一定有正負號、一定有「元」、一定有千分位。
@@ -1679,7 +1734,8 @@ function srcBadge(d){
     return `<span class="tag border bg-emerald-500/15 text-emerald-300 border-emerald-500/40" title="FinMind 真實數據，資料截止 ${esc(d.asOf||'（未知）')}${d.fetchedAt?'，抓取於台北時間 '+twHM(d.fetchedAt):''}">真實${d.asOf?' '+esc(String(d.asOf).slice(5)):''}</span>`;
   }
   if(d.src === 'rt'){
-    return `<span class="tag border bg-cyan-500/20 text-cyan-200 border-cyan-400/50" title="即時報價${d.rtTime?'，時間 '+esc(d.rtTime):''}">⚡ 即時${d.rtTime?' '+esc(String(d.rtTime).slice(-8)):''}</span>`;
+    const clk = rtClock(d.rtTime);
+    return `<span class="tag border bg-cyan-500/20 text-cyan-200 border-cyan-400/50" title="FinMind 即時報價（taiwan_stock_tick_snapshot）${d.rtTime?'，原始時間 '+esc(d.rtTime):''}。這不是收盤價，均線與本益比仍是前一個交易日的。">⚡ 即時${clk?' '+esc(clk):''}</span>`;
   }
   if(d.src === 'stale'){
     const v = staleDays(d.asOf);
@@ -2832,6 +2888,26 @@ function valuate(pe, d){
            note:`本益比 ${fmt(pe,1)} 倍高於昂貴門檻 ${B.rich}，位階「昂貴」。<strong>這一頁不提供任何減碼比例或資金去處的建議。</strong>${basisNote}` };
 }
 
+/* 短線位階（布林通道）。v84 之前這段邏輯只活在 tacticalOf 裡面，
+   而 tacticalOf 只有目標價視窗會呼叫——於是「這檔現在超買還是超賣」算得出來，
+   卻只有點進單一個股才看得到，清單上完全沒有。使用者問「我可以知道超買超賣是誰嗎」。
+   把它抽成唯一一份：tacticalOf 與清單都呼叫這裡。
+   絕對不要在清單那邊再抄一份 —— 這份程式最常見的缺陷就是
+   「同一個概念有 N 份手抄副本，其中 N−1 份是對的」。 */
+function shortState(d){
+  const t = d && d.targets, p = d && d.price;
+  if(!t || !(p > 0) || t.shortBuy == null || t.shortSell == null) return 'na';
+  if(p <= t.shortBuy)  return 'oversold';
+  if(p >= t.shortSell) return 'overbought';
+  return 'mid';
+}
+const SHORT_LABEL = {
+  oversold:   { txt:'短線超賣 🐆', cls:'bg-emerald-500/15 text-emerald-300 border-emerald-500/40',
+                tip:'收盤價跌破 20 日均線 − 2 標準差（布林下軌）。這是「短線跌得比平常多」的描述，不是買進建議，也未經回測驗證。' },
+  overbought: { txt:'短線超買 🐱', cls:'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/40',
+                tip:'收盤價衝上 20 日均線 ＋ 2 標準差（布林上軌）。這是「短線漲得比平常多」的描述，不是賣出建議，也未經回測驗證。' },
+};
+
 function stockAnimals(s){
   const a = [];
   const v = valuate(s.pe, s);
@@ -3035,8 +3111,42 @@ function restoreConnection(){
   const h = $('tokenHint');
   if(h){ h.className='text-[11px] text-emerald-300/90 mt-2';
          h.textContent='✅ 連線正常。資料仍是按「重新整理本頁」時才抓取，不會自動消耗額度。'; }
-  if(!was) toast('✅ 連線已自動恢復。畫面上的舊資料沒有變動，需要更新請按「重新整理本頁」。','ok');
+  /* 開機自動連線時這句話是錯的：沒有「恢復」，而且接下來可能馬上就要自動更新。 */
+  if(!was && !state._bootQuiet)
+    toast(state._booting
+      ? '✅ 已自動連線，可以按「重新整理本頁」取得今天的價格。'
+      : '✅ 連線已自動恢復。畫面上的舊資料沒有變動，需要更新請按「重新整理本頁」。','ok');
 }
+/* ══ 開機自動連線（v84）══
+   使用者問「能不能設定 token 自動連線」。原本「記住 Token」只做到把 Token 填回輸入框，
+   還是要按一下才會連——對一位 78 歲的使用者來說，那一下就是每天都要重學一次的步驟。
+
+   為什麼自動更新是「一天一次」而不是「每次打開」：
+   FinMind 免費方案每小時 600 次，自選清單有填成本的每檔要 7 次。
+   十檔就是 70 次，一小時內開九次就撞上限，然後整頁變成額度錯誤——
+   而這個 app 的使用者沒有任何辦法自己排除那種狀況。
+   連線本身只花 1 次最便宜的請求（silentReverify），那個每次開都做沒問題。
+
+   先寫日期再抓：中途失敗也不會變成「每次打開都重抓一輪」。 */
+async function bootAutoConnect(){
+  if(!state.autoConnect) return false;
+  if(!state.rememberToken || !state.token) return false;   // 沒存 Token 就無從自動連起
+  if(state._loggedOut) return false;
+  const willFetch = state.lastAutoFetch !== todayISO() && watchItems().length > 0;
+  /* 等一下就要跳進度列的話，就不要再多一則「已連線」提示——
+     進度列本身就是最清楚的回饋，兩個一起出現只是把畫面推得更長。 */
+  state._bootQuiet = willFetch;
+  let ok = false;
+  try{ ok = await silentReverify(); }
+  finally{ state._bootQuiet = false; }
+  if(!ok) return false;                       // 失敗時 silentReverify 已經排好退避重試
+  if(!willFetch) return true;
+  state.lastAutoFetch = todayISO(); persist();
+  try{ await startBulk('w'); }
+  catch(e){ console.error('auto fetch failed:', e); }
+  return true;
+}
+
 /* 每小時額度重置點（保守多等 30 秒） */
 function secsToNextHour(){
   const now = new Date();
@@ -4037,6 +4147,13 @@ function filteredList(){
       if(!dataReal(s.data)) return false;
       if(valuate(s.data && s.data.pe, s.data).key !== state.filter.level) return false;
     }
+    if(state.filter.short){
+      if(!s.loaded) loadStockMock(s);
+      /* 跟位階篩選同一道閘門：示範值絕對不能被篩進「超賣清單」——
+         那會生出一份看起來很專業的假買點名單，是這份程式最不能出的錯。 */
+      if(!dataReal(s.data)) return false;
+      if(shortState(s.data) !== state.filter.short) return false;
+    }
     if(state.filter.animal){
       if(!s.loaded) loadStockMock(s);
       if(!dataReal(s.data)) return false;
@@ -4087,7 +4204,7 @@ function renderT100(){
         ${s.inWatch?'<span class="tag border bg-emerald-600/15 text-emerald-300 border-emerald-500/40 mt-0.5">已在自選</span>':''}
       </td>
       <td class="px-2.5 py-2 text-slate-400 m-lab" data-label="產業">${safeText(s.ind,20)||'—'}</td>
-      <td class="px-2.5 py-2 text-right m-lab" data-label="最新收盤">
+      <td class="px-2.5 py-2 text-right m-lab" data-label="最新價格">
         <div class="tabular-nums font-semibold ${(d.src==='live'||d.src==='rt')?'text-white':'text-slate-400'}">${d.price==null?'—':fmt(d.price)}</div>
         <div class="mt-0.5">${srcBadge(d)}</div>
       </td>
@@ -4101,7 +4218,9 @@ function renderT100(){
       <td class="px-2.5 py-2 m-lab" data-label="動物狀態"><div class="flex flex-wrap gap-1">${animals.map(k=>animalTag(k, s.ind)).join('') || '<span class="text-slate-400 text-[12px]">—</span>'}</div></td>
       <td class="px-2.5 py-2 m-lab" data-label="長線位階">
         <div class="tag border ${v.cls} px-2 py-1">${v.light} ${v.label}</div>
-        ${d.err?`<div class="text-[12px] text-amber-400/90 mt-0.5 leading-snug">${safeText(d.err,160)}</div>`:''}
+        ${(()=>{ const k = real ? shortState(d) : 'na'; const L = SHORT_LABEL[k];
+           return L ? `<div class="tag border ${L.cls} px-2 py-1 mt-1" title="${esc(L.tip)}">${L.txt}</div>` : ''; })()}
+        ${d.err?`<div class="cell-note text-[12px] text-amber-400/90 mt-0.5 leading-snug">${safeText(d.err,160)}</div>`:''}
       </td>
       <td class="px-2.5 py-2" data-label="">
         <div class="flex items-center justify-center gap-2 flex-wrap">
@@ -4122,7 +4241,7 @@ function renderT100(){
   $('filterInfo').textContent = `已取得真實數據 ${realN} / ${t100.length} 檔`;
   const nt = $('filterNotice');
   if(nt){
-    if((state.filter.level || state.filter.animal) && realN < t100.length){
+    if((state.filter.level || state.filter.animal || state.filter.short) && realN < t100.length){
       nt.classList.remove('hidden');
       nt.innerHTML = `<strong>位階與動物狀態的篩選，只會列出已經抓到真實資料的股票。</strong>
         100 檔裡目前有 <strong>${realN}</strong> 檔有真實資料，其餘 ${t100.length-realN} 檔還是示範值——
@@ -4276,8 +4395,8 @@ function noteLine(s, d, animals, v, real){
   if(!rows.length) return '<span class="text-slate-400 text-[13px]">沒有。</span>';
   const [first, cls] = rows[0];
   const rest = rows.slice(1);
-  return `<div class="text-[14px] leading-snug ${cls}">${first}</div>` +
-    (rest.length ? `<div class="text-[12px] text-slate-400 leading-snug mt-1">${rest.map(r=>r[0]).join('；')}</div>` : '');
+  return `<div class="cell-note text-[14px] leading-snug ${cls}">${first}</div>` +
+    (rest.length ? `<div class="cell-note text-[12px] text-slate-400 leading-snug mt-1">${rest.map(r=>r[0]).join('；')}</div>` : '');
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -4320,33 +4439,98 @@ function perBaseClose(d){
   if(d.src !== 'rt' && d.price > 0) return d.price;
   return null;
 }
+/* ══ 在外流通股數 ══════════════════════════════════════════════
+   v84：這裡本來寫死「台灣上市普通股面額一律 10 元，股數 ＝ 股本 ÷ 10」。
+   那個「一律」是錯的——台灣 2014 年起開放彈性面額，KY 股與創新板有 5 元、1 元、
+   0.1 元、20 元的，用 10 去除會把股數算成好幾倍，每股數字就整個歪掉。
+
+   正解是**根本不要假設面額**。官方資料裡已經有一條精確的路：
+       PBR ＝ 股價 ÷ 每股淨值　　每股淨值 ＝ 權益 ÷ 股數
+       ⇒  股數 ＝ 權益 × PBR ÷ 股價
+   三個輸入（PBR、權益、收盤價）全是 FinMind 官方數字，一個假設都沒有。
+
+   面額只在「拿不到官方 PBR」時才當退路，而且那時畫面上一定寫明是假設。
+   反過來，官方路徑算出股數之後，還能把面額**推算回來**（股本 ÷ 股數），
+   所以現在畫面不只不再假設面額，還講得出這一檔的面額實際是多少。 */
+const PAR_ASSUMED = 10;          // 只在沒有官方 PBR 時當退路
+const PAR_MIN = 0.05, PAR_MAX = 200;   // 推算出來的面額超出這個範圍就是資料有問題
+/* 台灣實際在用的面額。2014 年彈性面額上路前一律 10 元，之後 KY 股與創新板出現 5／1／0.1 等。 */
+const PAR_STEPS = [100, 50, 20, 10, 5, 2, 1, 0.5, 0.1, 0.05, 0.01];
+const PAR_SNAP_TOL = 0.05;       // 推算值與某個實際面額相差 5% 以內就認定是它
+
+function sharesOutstanding(d){
+  if(!d) return null;
+  const px = perBaseClose(d) || d.price;
+  /* 第一步：用官方數字把面額**推算**出來（不是假設出來的）。
+       PBR ＝ 股價 ÷ 每股淨值，每股淨值 ＝ 權益 ÷ 股數
+       ⇒ 股數 ＝ 權益 × PBR ÷ 股價 ⇒ 面額 ＝ 股本 ÷ 股數 */
+  if(d.equity > 0 && d.pbr > 0 && px > 0){
+    const nByPbr = d.equity * d.pbr / px;
+    if(nByPbr > 0 && isFinite(nByPbr)){
+      if(!(d.capStock > 0))
+        return { shares:nByPbr, src:'official', par:null,
+                 how:'權益 × 股價淨值比 ÷ 股價（沒有股本可對，直接用官方推算）' };
+      const raw = d.capStock / nByPbr;
+      if(!(raw >= PAR_MIN && raw <= PAR_MAX))
+        return { blocked:true, why:'由官方數字推回來的面額不合理（' + fmt(raw,2) + ' 元）', par:+raw.toFixed(2) };
+      /* 第二步：貼齊到實際存在的面額。
+         推算值本身有雜訊——官方 PBR 用的是「母公司業主權益」，而財報的權益總額含非控制權益，
+         實測台積電差 0.7%（推算 9.93 元，實際 10 元）。
+         貼齊之後就能改用 股本 ÷ 面額，那條關係是定義上精確的，不含任何雜訊。
+         貼不上任何一個實際面額時，才退回用推算的股數本身——那時不宣稱知道面額。 */
+      const snap = PAR_STEPS.find(v => Math.abs(raw - v) / v <= PAR_SNAP_TOL);
+      if(snap) return { shares: d.capStock / snap, src:'official', par: snap, rawPar:+raw.toFixed(3),
+                        how:'由官方權益與股價淨值比推算面額為 ' + snap + ' 元，再用 股本 ÷ 面額 取得股數' };
+      return { shares:nByPbr, src:'official', par:null, rawPar:+raw.toFixed(3),
+               how:'權益 × 股價淨值比 ÷ 股價（推算面額 ' + fmt(raw,2) + ' 元對不上任何常見面額，因此不用面額換算）' };
+    }
+  }
+  if(d.capStock > 0)
+    return { shares: d.capStock / PAR_ASSUMED, src:'assumed', par: PAR_ASSUMED,
+             how:'普通股股本 ÷ ' + PAR_ASSUMED + '（拿不到官方股價淨值比，只能假設面額 ' + PAR_ASSUMED + ' 元）' };
+  return null;
+}
+/* 面額一句話：官方推算得出來就講實際值，講不出來就說「不知道」。 */
+function parNote(d){
+  const r = sharesOutstanding(d);
+  if(!r || r.blocked) return '';
+  if(r.src === 'assumed')
+    return '<span class="text-amber-300/90">這一檔的面額是<strong>假設</strong> ' + PAR_ASSUMED + ' 元（官方股價淨值比抓不到，無法推算）。</span>';
+  if(r.par == null)
+    return '<span class="text-slate-500">這一檔推算出來的面額對不上任何常見面額，因此股數直接由官方權益與股價淨值比取得，沒有經過面額換算。</span>';
+  return '<span class="text-slate-500">面額由官方數字推算為 <strong class="text-slate-300">'
+       + fmt(r.par,2) + ' 元</strong>' + (r.par === 10 ? '（就是常見的 10 元）' : '——<span class="text-amber-300">不是 10 元</span>') + '。</span>';
+}
+
 /* ══ 自由現金流殖利率 ══════════════════════════════════════════
    ＝ 每股自由現金流 ÷ 股價 ＝ 近四季自由現金流 ÷ 市值（兩種寫法同一件事）
 
-   股數怎麼來：台灣上市普通股面額幾乎一律 10 元，所以 股數 ＝ 普通股股本 ÷ 10。
-   但「幾乎」不等於「一定」，所以另外用官方數字做一次獨立驗算：
-       由 PBR 反推的股數 ＝ 權益總額 × PBR ÷ 股價
-   兩者差超過 15% 就代表面額假設在這一檔不成立（或權益含大額非控制權益），
-   那就**不給數字**，而不是給一個看起來很具體的錯數字。
+   股數一律走 sharesOutstanding()：官方優先、不假設面額。
+   兩條路都算得出來時再互相對一次帳（官方 vs 面額假設），差太多就把話講明。
 
    分母用哪個價格：跟本益比同一個錨——官方 PER 那一天的收盤。
-   否則盤中每跳動一次，這個「殖利率」就變一次，跟今天剛修掉的目標價問題是同一個。 */
+   否則盤中每跳動一次，這個「殖利率」就變一次，跟先前修掉的目標價問題是同一個。 */
 const FCF_SHARE_TOL = 0.15;
 function fcfYield(d){
-  if(!d || !(d.fcfTTM != null) || !(d.capStock > 0)) return null;
+  if(!d || !(d.fcfTTM != null)) return null;
   const px = perBaseClose(d) || d.price;
   if(!(px > 0)) return null;
-  const shares = d.capStock / 10;
+  const sh = sharesOutstanding(d);
+  if(!sh) return null;
+  if(sh.blocked) return { blocked:true, why: sh.why, par: sh.par };
+  const shares = sh.shares;
   if(!(shares > 0)) return null;
-  let crossOk = null, implied = null;
-  if(d.equity > 0 && d.pbr > 0){
-    implied = d.equity * d.pbr / px;
-    crossOk = Math.abs(implied - shares) / shares <= FCF_SHARE_TOL;
+  /* 對帳：官方推算 vs「面額 10 元」的老算法。差很多不再是「不給數字」的理由——
+     現在主路徑不靠面額了，差異本身就是答案（這檔的面額不是 10 元）。 */
+  let byPar = null, crossOk = null;
+  if(d.capStock > 0){
+    byPar = d.capStock / PAR_ASSUMED;
+    crossOk = Math.abs(byPar - shares) / shares <= FCF_SHARE_TOL;
   }
-  if(crossOk === false) return { blocked:true, why:'股數對不起來', shares, implied };
   const perShare = d.fcfTTM / shares;
   return { yield: +(perShare / px * 100).toFixed(2), perShare: +perShare.toFixed(2),
-           shares, px, crossOk, asOf: d.fcfAsOf, how: d.fcfHow,
+           shares, px, crossOk, byPar, par: sh.par, sharesSrc: sh.src, sharesHow: sh.how,
+           asOf: d.fcfAsOf, how: d.fcfHow,
            ocf: d.ocfTTM, capex: d.capexTTM, fcf: d.fcfTTM };
 }
 /* 一句白話。數字單獨出現一定被誤讀，所以永遠附一句解釋它是什麼。 */
@@ -4358,7 +4542,7 @@ function fcfLine(d){
     ? `<span class="text-slate-500">${safeText(d.fcfNote,160)}</span>`
     : '<span class="text-slate-500">還沒有這檔的現金流量表，按「重新整理本頁」取得。</span>';
   if(f.blocked)
-    return '<span class="text-slate-500">這檔的股本與淨值對不起來（可能不是 10 元面額），為避免算錯，不顯示每股現金流。</span>';
+    return '<span class="text-slate-500">這檔的股本、權益與股價淨值比兜不起來（' + esc(String(f.why||'')) + '），為避免算錯，不顯示每股現金流。</span>';
   if(f.fcf < 0)
     return `<span class="text-rose-300 font-semibold">這家公司近四季<strong>沒有生出自由現金</strong>：`
          + `賺到的現金 ${fmt(f.ocf/1e8,0)} 億，花在買設備蓋廠 ${fmt(f.capex/1e8,0)} 億，倒欠 ${fmt(Math.abs(f.fcf)/1e8,0)} 億。</span>`
@@ -4461,13 +4645,8 @@ function tacticFor(s){
     else if(p <= t.midBuy * 1.02) midSt = 'atMa60';
     else midSt = 'above';
   }
-  // 短線位階
-  let shortSt = 'na';
-  if(t.shortBuy != null){
-    if(p <= t.shortBuy) shortSt = 'oversold';
-    else if(p >= t.shortSell) shortSt = 'overbought';
-    else shortSt = 'mid';
-  }
+  // 短線位階（唯一一份定義在 shortState()，清單那邊用的是同一個函式）
+  const shortSt = shortState(d);
   const aboveYear = (d.ma240 != null) && p > d.ma240;
   const whale = d.holder > 0 && d.holderPrev > 0;
 
@@ -4832,6 +5011,9 @@ function targetPanelHTML(s){
       <div class="rounded-lg border border-slate-600/50 bg-slate-800/40 p-2.5 mt-3 text-[13px] leading-relaxed">
         <div class="text-[11px] text-slate-400 mb-1">💵 這家公司一年真正生出來的現金（官方現金流量表）</div>
         <div class="text-slate-300">${fcfLine(d)}</div>
+        <!-- v84：面額不再寫死 10 元。這一行把「這一檔的面額到底是多少、怎麼來的」講出來，
+             因為每股現金流是拿它換算的——換算依據看不見，數字就無從查核。 -->
+        ${(()=>{ const pn = parNote(d); return pn ? `<div class="text-[11px] mt-1 leading-relaxed">${pn}</div>` : ''; })()}
       </div>
       ${trapped ? `<div class="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-200 p-2 text-[11px] leading-relaxed">
         ⚠️ 這檔近 4 季 EPS 逐季下滑，本益比估值法在此時會嚴重失真（低本益比陷阱）。
@@ -5202,8 +5384,9 @@ function renderLegend(){
       </div>
       <div class="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-slate-700/40">
         ${ANIMAL_SOLO.map(k=>{ const a=A(k); return `<div class="flex-1 min-w-0 p-2.5">
-          <div class="flex items-center gap-1.5 mb-1"><span class="text-lg leading-none">${a.e}</span>
-            <span class="text-[11px] font-bold text-slate-300">${a.n}</span></div>
+          <div class="flex items-center gap-1.5 mb-1 flex-wrap"><span class="text-lg leading-none">${a.e}</span>
+            <span class="text-[11px] font-bold text-slate-300">${a.n}</span>
+            <span class="text-[9px] px-1 py-0.5 rounded text-slate-300 bg-white/5 whitespace-nowrap">${SOLO_TAG[k]||''}</span></div>
           <div class="text-[10px] text-slate-400 leading-snug">${a.d}</div>
         </div>`; }).join('')}
       </div>
@@ -5254,9 +5437,9 @@ function renderTable(){
       </td>
       <td class="px-2.5 py-2 m-lab" data-label="標的">
         <div class="font-bold text-white">${esc(s.id)}</div>
-        <div class="text-[10px] text-slate-400"><span class="c-name">${safeText(s.name,30)}</span><span class="c-sep"> · </span><span class="c-cost"><span class="nb">成本 ${SENS(fmt(s.cost))}</span> · <span class="nb">${SENS(shareText(s.shares))}</span></span></div>
+        <div class="text-[10px] text-slate-400 leading-snug"><span class="c-name">${safeText(s.name,30)}</span><span class="c-cost">成本 ${SENS(fmt(s.cost))}</span><span class="c-shares">${SENS(shareText(s.shares))}</span></div>
       </td>
-      <td class="px-2.5 py-2 text-right m-lab" data-label="最新收盤">
+      <td class="px-2.5 py-2 text-right m-lab" data-label="最新價格">
         <div class="tabular-nums font-semibold ${(d.src==='live'||d.src==='rt')?'text-white':'text-slate-400'}">${d.price==null?'—':fmt(d.price)}</div>
         <div class="mt-0.5">${srcBadge(d)}</div>
       </td>
@@ -5271,9 +5454,9 @@ function renderTable(){
         })()}
         ${(()=>{ const q = positionOf(s);
             if(q.unresolved > 0)
-              return `<div class="text-[12px] text-amber-300 font-normal mt-1 leading-snug">這一檔有 ${q.unresolved} 天又除權又除息，系統分不出來，股數與成本偏低。按「交易紀錄」自己補。</div>`;
+              return `<div class="cell-note text-[12px] text-amber-300 font-normal mt-1 leading-snug">這一檔有 ${q.unresolved} 天又除權又除息，系統分不出來，股數與成本偏低。按「交易紀錄」自己補。</div>`;
             if(q.shares > 0 && !q.firstBuy)
-              return `<div class="text-[12px] text-slate-400 font-normal mt-1 leading-snug">買進日期不詳，所以沒有算任何除權息。</div>`;
+              return `<div class="cell-note text-[12px] text-slate-400 font-normal mt-1 leading-snug">買進日期不詳，所以沒有算任何除權息。</div>`;
             return ''; })()}</td>
       <td class="px-2.5 py-2 text-right tabular-nums ${hCls} m-lab" data-label="千張大戶">${d.holder==null?'—':pct(d.holder)}</td>
       <td class="px-2.5 py-2 text-right tabular-nums ${debtCls} m-lab" data-label="負債比">${d.debt==null?'—':(d.debt*100).toFixed(1)+'%'}</td>
@@ -5281,19 +5464,21 @@ function renderTable(){
         ${d.peSrc==='official'
             ? `<div class="text-[10px] text-emerald-400/80 font-normal">官方${d.perAsOf?' '+esc(String(d.perAsOf).slice(5)):''}</div>`
             : (d.peSrc==='calc' ? '<div class="text-[10px] text-slate-500 font-normal">自算</div>' : '')}
-        <div class="pe-note text-[12px] text-slate-400 font-normal leading-snug mt-0.5 text-left">${peBaseRate(d, vTrue, real)}</div></td>
+        <div class="pe-note cell-note text-[12px] text-slate-400 font-normal leading-snug mt-0.5 text-left">${peBaseRate(d, vTrue, real)}</div></td>
       <td class="px-2.5 py-2 m-lab" data-label="動物狀態">
         <div class="flex flex-wrap gap-1">${animals.map(k=>animalTag(k, s.ind)).join('') || '<span class="text-slate-400 text-[12px]">—</span>'}</div>
         <!-- 符號旁邊永遠附一句白話。C4 引 Hou & Hu (2023)：高齡者在小尺寸下不會先看圖示，
              所以圖示不能是唯一的資訊來源；「🐊 鱷魚」旁邊要有「這檔賠了 −18.2%」。 -->
-        <div class="mt-1">${noteLine(s, d, animalsAll, vTrue, real)}</div>
-        ${d.err?`<div class="text-[12px] text-amber-400/90 mt-1 leading-snug">${safeText(d.err,160)}</div>`:''}
+        <div class="cell-note mt-1">${noteLine(s, d, animalsAll, vTrue, real)}</div>
+        ${d.err?`<div class="cell-note text-[12px] text-amber-400/90 mt-1 leading-snug">${safeText(d.err,160)}</div>`:''}
       </td>
       <td class="px-2.5 py-2 m-lab" data-label="長線位階">
         <div class="tag border ${v.cls} px-2 py-1">${v.light} ${v.label}</div>
+        ${(()=>{ const k = real ? shortState(d) : 'na'; const L = SHORT_LABEL[k];
+           return L ? `<div class="tag border ${L.cls} px-2 py-1 mt-1" title="${esc(L.tip)}">${L.txt}</div>` : ''; })()}
         ${real && t && t.longOk && !muted ? (t.longBroken
-            ? `<div class="text-[12px] text-amber-300/90 mt-0.5 leading-snug">本益比已經脫離它自己的歷史區間，算不出有意義的價位</div>`
-            : `<div class="text-[12px] text-slate-400 mt-0.5">便宜 $${fmt(t.cheap,1)} · 合理 $${fmt(t.fair,1)} · 昂貴 $${fmt(t.rich,1)}</div>`) : ''}
+            ? `<div class="cell-note text-[12px] text-amber-300/90 mt-0.5 leading-snug">本益比已經脫離它自己的歷史區間，算不出有意義的價位</div>`
+            : `<div class="cell-note text-[12px] text-slate-400 mt-0.5">便宜 $${fmt(t.cheap,1)} · 合理 $${fmt(t.fair,1)} · 昂貴 $${fmt(t.rich,1)}</div>`) : ''}
         ${real ? '' : '<div class="text-[12px] text-slate-500 mt-0.5">連線後才會判定</div>'}
       </td>
       <td class="px-2.5 py-2" data-label="">
@@ -5313,7 +5498,7 @@ function renderTable(){
   const tp = totalPages(), n = watchItems().length;
   const mockN = items.filter(x=>x.data && x.data.src!=='live' && x.data.src!=='rt').length;
   $('pageInfo').innerHTML = `第 <strong class="text-slate-200">${state.page}</strong> / ${tp} 頁 · 自選 ${n} 檔 · <span class="text-cyan-400">「重新整理」僅抓取本頁 ${items.length} 檔</span>` +
-    (items.length === 0 ? '' : mockN ? ` · <span class="text-amber-400">本頁 ${mockN} 檔尚未取得真實數據</span>` : ' · <span class="text-emerald-400">本頁 ${items.length} 檔都是真實數據</span>');
+    (items.length === 0 ? '' : mockN ? ` · <span class="text-amber-400">本頁 ${mockN} 檔尚未取得真實數據</span>` : ` · <span class="text-emerald-400">本頁 ${items.length} 檔都是真實數據</span>`);
   $('wlCount').textContent = `（${n} 檔）`;
   $('pager').innerHTML = pagerHTML(state.page, tp, 'w', 'jumpPage');
 }
@@ -6106,6 +6291,11 @@ const ANIMAL_PAIRS = [
   { t:'決策依據', sub:'由心理防線快篩觸發，不是市場數據', a:'fox',    b:'sheep',   la:'有自己的依據', lb:'跟著喊單走' }
 ];
 const ANIMAL_SOLO = ['deadcat','pig','swan'];
+/* 成對的那些在圖鑑上都有一句「觸發條件」，這三隻本來沒有。
+   加上去有兩個理由：使用者少一次猜測；而且 audit.mjs 那條
+   「符號不得是唯一的資訊來源」在名字只有一個字（豬）時會擋下來——
+   那條規則是對的，該補的是內容，不是把門檻調鬆。 */
+const SOLO_TAG = { deadcat:'年線下方無量急拉', pig:'估值進入昂貴區', swan:'極端事件情境' };
 
 
 /* ══════════════════════════════════════════════════════════════
@@ -6677,7 +6867,12 @@ function applySnapshot(o, opts={}){
        lastAutoFetch 只收合法日期字串——它是額度的閘門，讓備份檔塞任意值進來
        等於讓別人的檔案決定你今天要不要多打一輪 API。 */
     if(typeof o.autoConnect === 'boolean') state.autoConnect = o.autoConnect;
-    if(typeof o.lastAutoFetch === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.lastAutoFetch)){
+    /* 形狀對還不夠：一個「未來的日期」（存檔壞掉、或這台裝置時鐘曾經跑掉）
+       會讓 lastAutoFetch !== todayISO() 永遠不成立，自動更新就此永久失效，
+       而且畫面上不會有任何徵兆——使用者只會覺得「它就是不更新了」。
+       未來日期一律當成沒有記錄，最壞的下場只是今天多抓一輪。 */
+    if(typeof o.lastAutoFetch === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.lastAutoFetch)
+       && o.lastAutoFetch <= todayISO()){
       state.lastAutoFetch = o.lastAutoFetch;
     }
   }
@@ -6911,6 +7106,19 @@ function openDataPanel(){
           <div class="text-[11px] text-slate-400 leading-relaxed mt-0.5">
             開啟後就不必每次重貼 Token。但 Token 會以<strong class="text-amber-300">明文</strong>存在這台電腦的瀏覽器儲存空間中——
             <strong>共用電腦、公司電腦請不要開啟</strong>。預設為關閉。
+          </div>
+        </div>
+      </label>
+      <label class="flex items-start gap-2.5 p-2.5 rounded-lg bg-slate-950/50 border border-slate-700/50 cursor-pointer ${(HAS_STORE && state.rememberToken)?'':'opacity-50'}">
+        <input type="checkbox" id="optAutoConn" class="accent-emerald-500 mt-0.5" ${state.autoConnect?'checked':''} ${(HAS_STORE && state.rememberToken)?'':'disabled'}>
+        <div>
+          <div class="text-[12px] font-semibold text-slate-200">打開網頁就自動連線</div>
+          <div class="text-[11px] text-slate-400 leading-relaxed mt-0.5">
+            不必每次按「驗證並連線」。連線本身只花 <strong>1 次</strong> API 額度。<br>
+            另外，<strong>當天第一次</strong>打開時會自動更新一次自選清單（同一天再打開只連線、不重抓），
+            所以打開就看得到今天的數字，額度也不會被開開關關打光。
+            ${state.rememberToken ? '' : '<span class="text-amber-300">要先開啟上面的「一併記住 Token」才有作用——沒存 Token 就無從自動連起。</span>'}
+            ${state.lastAutoFetch ? `<br><span class="text-slate-500">上次自動更新：${esc(state.lastAutoFetch)}</span>` : ''}
           </div>
         </div>
       </label>
@@ -7182,9 +7390,9 @@ function doJump(el){
 }
 /* v79：百大資料庫的篩選。每一個都只改 state.filter，然後統一走 applyFilter()——
    篩選條件散在多個地方各自 render，就是同一份程式最容易出現不一致的地方。 */
-['searchInput','indFilter','levelFilter','animalFilter','holdOnly'].forEach(id=>{
+['searchInput','indFilter','levelFilter','shortFilter','animalFilter','holdOnly'].forEach(id=>{
   const el = document.getElementById(id); if(!el) return;
-  const key = { searchInput:'q', indFilter:'ind', levelFilter:'level', animalFilter:'animal', holdOnly:'holdOnly' }[id];
+  const key = { searchInput:'q', indFilter:'ind', levelFilter:'level', shortFilter:'short', animalFilter:'animal', holdOnly:'holdOnly' }[id];
   const ev  = (id === 'searchInput') ? 'input' : 'change';
   el.addEventListener(ev, e=>{
     state.filter[key] = (id === 'holdOnly') ? e.target.checked : e.target.value;
@@ -7193,8 +7401,8 @@ function doJump(el){
 });
 const _cf = document.getElementById('clearFilter');
 if(_cf) _cf.addEventListener('click', ()=>{
-  state.filter = { q:'', ind:'', holdOnly:false, level:'', animal:'' };
-  ['searchInput','indFilter','levelFilter','animalFilter'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
+  state.filter = { q:'', ind:'', holdOnly:false, level:'', animal:'', short:'' };
+  ['searchInput','indFilter','levelFilter','shortFilter','animalFilter'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
   const h=$('holdOnly'); if(h) h.checked=false;
   applyFilter();
 });
@@ -7214,6 +7422,14 @@ document.addEventListener('change', e=>{
     if(state.autoSave) persist(); else { clearStore(); }
     updateSaveStatus();
     toast(state.autoSave ? '已開啟自動儲存。' : '已關閉自動儲存，並清除本機已存資料。', 'info');
+    return;
+  }
+  if(e.target.id==='optAutoConn'){
+    state.autoConnect = e.target.checked;
+    persist();
+    toast(state.autoConnect
+      ? '已開啟：下次打開網頁會自動連線，當天第一次還會自動更新一次自選清單。'
+      : '已關閉自動連線。以後要自己按「驗證並連線」。', 'info');
     return;
   }
   if(e.target.id==='optToken'){
@@ -7884,6 +8100,7 @@ if(!HAS_STORE) askRemember();
  ['rhinoMidTxt', (RHINO_MID*100).toFixed(0)+'～'+(RHINO_HI*100).toFixed(0)+'%'],
  ['crocTxt', CROC_PNL+'%']].forEach(([id,txt])=>{ const el=document.getElementById(id); if(el) el.textContent = txt; });
 renderIndFilter();
+renderLegend();
 applySecOpen();
 renderQuiz();
 /* 開機不得被單一渲染例外炸死。舊版一旦 renderAll 拋錯，後面的 applyFontScale／loadMarket／
@@ -7903,6 +8120,15 @@ updateMockButton();
    於是大盤圖永遠是空的。而 r13/v61.mjs 只驗了 `#taiexChart` **存在**，沒驗它有沒有資料，
    所以測試全綠。跟 closeBig 那次是同一個形狀：測了東西在不在，沒測它會不會動。 */
 try{ loadMarket(); }catch(e){ console.error('loadMarket failed at boot:', e); }
+/* v84：開機自動連線。放在最後——前面所有渲染都跑完了，
+   自動更新跳出來的進度列才不會蓋在一個還沒畫好的畫面上。
+   刻意不 await：開機流程不能被網路請求卡住，
+   使用者在連線完成之前照樣可以操作整頁（畫面上是上次存的舊資料）。 */
+state._booting = true;
+bootAutoConnect()
+  .catch(e=>{ console.error('bootAutoConnect failed:', e); })
+  .finally(()=>{ state._booting = false; });
+
 /* 網路回來、或分頁重新回到前景時，立刻試一次重連（不等退避計時器） */
 window.addEventListener('online', ()=>{ if(state.token && !state.live && !state._loggedOut){ cancelReconnect(); silentReverify(); } });
 window.addEventListener('offline', ()=>{ if(state.live) degradeConnection(new ApiError('這台裝置目前沒有網路連線','offline','網路恢復後會自動重連。')); });
