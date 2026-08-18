@@ -527,8 +527,18 @@
     #t100Body tr:not([data-open]) td:nth-child(6),
     #t100Body tr:not([data-open]) td:nth-child(8){ display:none !important; }
     /* 收起時動作列只留「看詳細」，其餘三顆藏起來——三檔股票就是九顆按鈕，那是雜訊不是功能 */
-    #wlBody tr:not([data-open]) td:nth-child(10) button:not([data-act="fold"]),
-    #t100Body tr:not([data-open]) td:nth-child(9) button:not([data-act="fold"]){ display:none !important; }
+    /* v85：使用者回報「百大資料庫沒有目標價可以按，桌機跟手機都沒有」。
+       他是對的，而且比「藏了一層」更嚴重——是**完全按不到**：
+         · 這條規則把收合列的操作按鈕全部 display:none；
+         · 但「看詳細 ▾」那顆只做在自選清單裡（renderWatch），百大的列根本沒有；
+         · 於是百大在窄畫面下沒有任何辦法叫出 目標價 或 加入自選。
+       「加入自選」是使用者建立自己清單的唯一入口，等於手機上完全不能用。
+       這條規則是從自選清單複製過來卻沒跟上差異——又是同一種缺陷。
+
+       修法：百大表格**不隱藏**操作欄。那張表只有兩顆按鈕，而且正是它存在的理由。
+       自選清單維持收合（它有展開鈕、有四個動作，其中三個會動到資料），
+       但「目標價」放行——那是核心畫面，不該躲在展開層裡。 */
+    #wlBody tr:not([data-open]) td:nth-child(10) button:not([data-act="fold"]):not([data-act="target"]){ display:none !important; }
     #wlBody tr:not([data-open]) td:nth-child(10),
     #t100Body tr:not([data-open]) td:nth-child(9){ margin-top:8px !important; padding-top:8px !important; }
     .only-mobile{ display:inline-flex !important; }
@@ -695,7 +705,7 @@
            起因是很實際的一件事：改好的東西部署上去之前，畫面上完全看不出手上這份是哪一版，
            使用者以為沒改、我以為改了，兩邊各講各的。這一行由 build.sh 在建置時填入，
            不可能寫錯，也不會忘了更新。 -->
-      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v84 · 2026-08-18 15:34</span>
+      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v85 · 2026-08-18 15:57</span>
     </div>
 
     <!-- 設定：預設收合。裡面是 Token、登出、診斷、隱私、說明、示範資料、資料儲存、進階設定。 -->
