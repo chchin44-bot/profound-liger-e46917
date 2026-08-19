@@ -925,7 +925,7 @@
            起因是很實際的一件事：改好的東西部署上去之前，畫面上完全看不出手上這份是哪一版，
            使用者以為沒改、我以為改了，兩邊各講各的。這一行由 build.sh 在建置時填入，
            不可能寫錯，也不會忘了更新。 -->
-      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v92 · 2026-08-19 17:34</span>
+      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v92 · 2026-08-19 21:34</span>
     </div>
 
     <!-- 設定：預設收合。裡面是 Token、登出、診斷、隱私、說明、示範資料、資料儲存、進階設定。 -->
@@ -2063,7 +2063,12 @@ function positionOf(s, upto){
 
     }else if(t.kind === 'div'){
       /* 現金股利不改變成本，台灣券商的參考損益也是這樣算。單獨累計。 */
-      if(shares > 0 && p > 0) divCash += shares * p;
+      /* v92b：把「這一筆實際入帳多少」標回紀錄上，跟賣出已經有的 _usedShares 同一個作法。
+         兩個理由：交易紀錄頁要印「這次領到多少錢」時不必自己再算一次
+         （再算一次就是第二份實作，而它遲早會跟這裡不一致——這個專案修過三次同樣的錯）；
+         以及不變量檢查才有辦法在**完全不看實作**的前提下驗現金守恆。 */
+      t._cash = (shares > 0 && p > 0) ? shares * p : 0;
+      if(t._cash) divCash += t._cash;
 
     }else if(t.kind === 'stkdiv'){
       /* 配股：股數增加，成本總額不變 → 每股平均成本自動下降。 */
@@ -2079,8 +2084,10 @@ function positionOf(s, upto){
          退還的現金直接扣減成本總額，這是台灣券商的作法。 */
       const before = shares;
       const after = (t.ratio > 0 && t.ratio < 1) ? shares * t.ratio : Math.max(0, shares - n);
+      t._cash = 0;
       if(p > 0){
         const back = before * p;                 // 實際收到的現金
+        t._cash = back;                          // 同上：把實際入帳金額標回紀錄
         /* v85：舊版做 cost -= back，然後在下面把負數 clamp 成 0——
            退還股款超過剩餘成本時，那筆差額就人間蒸發了。
            實測 1000 股@1（成本 1,020）現金減資每股退 5 元：收到 5,000 元，
@@ -10098,15 +10105,50 @@ bootAutoConnect()
    所以你的成本價與交易紀錄不會被動到。看完關掉分頁或重新整理即可。
    ══════════════════════════════════════════════════════════════ */
 function runSelfTest(){
-  /* 第一件事就是關掉自動儲存——測試會在記憶體裡塞假的持股，絕不能寫進他的存檔。 */
+  /* 第一件事就是關掉自動儲存——有兩處測試一定要走全域狀態（真的表單、存檔往返），
+     那期間絕不能寫進他的存檔。 */
+  const _autoSave0 = state.autoSave, _priv0 = state.privacy,
+        _sel0 = state.selected, _txn0 = state.txnStock;
+  /* v92c（使用者指出的）：`state._selftest = true` 以前全檔只設不清，
+     一旦跑過就永遠停在測試模式，直到重新整理。而且測試會改動記憶體裡的真實狀態——
+     「不會寫壞存檔」是真的，「不會改動目前狀態」是假的。
+     使用者如果不是照說明重新整理，而是用上一頁返回、或只是把測試畫面關掉，
+     這個分頁就停在假資料上。
+     現在：① 絕大多數測試改用完全獨立的假物件（見 fresh()）；
+           ② 剩下兩處非碰不可的，整份備份在這裡，finally 一定還原；
+           ③ _selftest 與 autoSave 都在 finally 清乾淨。 */
+  const _watch0 = JSON.parse(JSON.stringify(state.watchlist));
   state.autoSave = false;
   state._selftest = true;
 
+  try{
   const rows = [];
 const T = (id, name, fn) => rows.push({ id, name, fn });
 
 /* 每個案例共用的乾淨起點 */
+/* v92c（使用者指出的）：這裡本來是直接抓 state.watchlist 裡真正的 2330 來改。
+   結果是「不會寫壞 localStorage」為真，但「不會改動目前 app 狀態」為假——
+   使用者如果不是照說明重新整理，而是用上一頁返回、或只是把測試畫面關掉，
+   這個分頁就停在假資料上。
+   positionOf()／allTxns()／applyStockData() 本來就幾乎是純函式（實測過），
+   所以改成餵一個**完全獨立的假物件**，正式的 state 一根寒毛都不會動到。
+   真的需要動到全域狀態的只剩兩處（走表單的 TC-004b、驗存檔往返的 I5），
+   那兩處另外用 freshReal() 標明，而且外層有整份備份／還原。 */
 function fresh(txns, data){
+  const ser = [], t = new Date(Date.parse(todayISO() + 'T00:00:00'));
+  for (let i = 800; i >= 0; i--) ser.push({ date: new Date(t - i * 86400000).toISOString().slice(0, 10), close: 100 });
+  const fake = { id: '2330', name: '（自我測試用）', ind: '半導體',
+                 inWatch: true, txnsMigrated: true, txnHide: [], txns: (txns || []).slice() };
+  applyStockData(fake, Object.assign({
+    price: 100, eps: 5, debt: .3, series: ser, asOf: todayISO(),
+    per: 20, perHist: [10, 20, 30], perAsOf: todayISO(), corpEvents: []
+  }, data || {}), 'live');
+  applyPosition(fake);
+  return fake;
+}
+/* 只有「一定要走全域狀態」的測試才用這一支（走真的表單、驗存檔往返）。
+   名字刻意取得刺眼，讓人一眼看得出來這裡會動到正式資料。 */
+function freshReal(txns, data){
   const s = state.watchlist.find(x => x.id === '2330');
   s.inWatch = true; s.txnsMigrated = true; s.txnHide = []; s.txns = (txns || []).slice();
   state.txnStock = '2330'; state.privacy = false;
@@ -10195,7 +10237,9 @@ T('TC-004', '買 1000 → 減資到 800 → 再買 500', () => {
 });
 
 T('TC-004b', '補記「比較早」的減資，比例要用那天的股數', () => {
-  const s = fresh([
+  /* 這一條走的是真正的表單（openTxnPage → txnAdd），所以必須用全域狀態。
+     外層有整份備份／還原，跑完會復原。 */
+  const s = freshReal([
     { id: 'b1', kind: 'buy', date: '2024-01-05', shares: 1000, price: 100 },
     { id: 'b2', kind: 'buy', date: '2024-12-05', shares: 1000, price: 100 }
   ]);
@@ -10576,6 +10620,208 @@ T('TC-014', '拿不到官方股價淨值比時，不可以假設面額 10 元', 
 /* ══════════════════════════════════════════════════════════════ */
 
 
+
+  /* ══════════════════════════════════════════════════════════════
+     不變量檢查（亂數帳本壓力測試）
+     ══════════════════════════════════════════════════════════════
+     上面那些 TC 是「我想得到的情境」。真正剩下的錯，照定義就是我沒想到的那些。
+     所以這一段反過來做：亂數生成幾百本帳本（買、部分賣、全賣、再買、配股、配息、
+     減資、同一天多筆、日期不詳、官方公司行為與自己補的撞在一起），
+     然後檢查那些「不管怎麼組合都必須成立」的關係。不需要事先知道正確答案。
+
+       I1  不丟例外
+       I2  股數／成本／已實現／現金股利都是有限數（不是 NaN、不是 Infinity）
+       I3  股數 ≥ 0；成本 ≥ 0；賣光時成本必須歸零
+       I4  沒有警告的帳本，把輸入順序打亂結果必須一樣
+       I5  存檔 → 重載，四個數字完全一樣
+       I6  現金守恆：付出去的錢 − 收到的錢 ＝ 剩餘成本 − 已實現損益 − 現金股利
+           （這條式子裡沒有平均成本、沒有攤提，跟被測邏輯完全無關）
+       I7  同一天、同一件事的公司行為只能算一次
+
+     I6 是這一組裡最有力的一條：它用「錢的進出」直接對帳，
+     任何攤提、比例、順序的錯都會讓等號不成立。
+
+     ══ 變異驗證（2026-08-19 實跑：把 bug 一個一個放回去，確認這裡真的會紅）══
+       官方與自己補的公司行為又重複套用          → 抓到
+       賣出時成本沒有等比例移除                   → 抓到
+       現金減資退還的錢又人間蒸發                 → 抓到（見下）
+       配息的入帳金額算錯                         → 抓到
+       配股時成本總額被一起放大（應該不變）       → 抓到
+
+     兩件要據實記下來的事：
+
+     ① 「現金減資退還的錢人間蒸發」第一次**沒有**被抓到。
+        不變量是對的，問題出在亂數生成器：退還金額被壓在 6 元以內，
+        200 本帳本幾乎撞不到「退還超過剩餘成本」那個分支。
+        不變量寫對了沒有用，還要真的走到那條路——生成器已經調整。
+
+     ② 「排序寫回 || 9」不會被這裡抓到，是被上面的 TC-001／TC-002 抓到的。
+        那是對的分工：同一天誰先誰後是這一頁的**設計選擇**（公司行為排在買賣之前，
+        因為除權息基準日以前一日收盤為準），不是數學上的不變量。
+        設計選擇要用具名案例釘住，不變量負責的是「不管怎麼組合都不能違反」的那一類。 */
+  function runInvariants(rounds, seedIn){
+    let seed = (seedIn == null ? 20260819 : seedIn) >>> 0;
+    const rnd = () => { seed ^= seed << 13; seed >>>= 0; seed ^= seed >> 17; seed ^= seed << 5; seed >>>= 0; return seed / 4294967296; };
+    const pick = a => a[Math.floor(rnd() * a.length)];
+    const int = (lo, hi) => lo + Math.floor(rnd() * (hi - lo + 1));
+    const DAY0 = Date.parse('2019-01-01T00:00:00');
+    const SPAN = Math.floor((Date.parse(todayISO() + 'T00:00:00') - DAY0) / 86400000);
+    const dateAt = n => new Date(DAY0 + n * 86400000).toISOString().slice(0, 10);
+
+    const gen = () => {
+      const n = int(1, 12), out = [];
+      const days = Array.from({ length: int(1, 4) }, () => int(0, SPAN));
+      for (let i = 0; i < n; i++) {
+        const kind = pick(['buy','sell','buy','sell','div','stkdiv','reduce']);
+        const t = { id: 'z' + i, kind, date: dateAt(pick(days)) };
+        if (rnd() < 0.08) { t.date = ''; t.dateUnknown = true; }
+        if (kind === 'buy' || kind === 'sell') {
+          t.shares = pick([1, 7, 100, 1000, 2000, 15000]);
+          /* 也要有「很便宜的股票」，成本才可能小於減資退還的金額 */
+          t.price = rnd() < 0.3 ? +(rnd() * 3 + 0.5).toFixed(2) : +(rnd() * 900 + 0.5).toFixed(2);
+        } else if (kind === 'div') { t.shares = 0; t.price = +(rnd() * 8).toFixed(2); }
+        else if (kind === 'stkdiv') { t.shares = 0; t.price = 0; t.ratio = +(1 + rnd() * 1.5).toFixed(3); }
+        else {
+          t.shares = 0; t.ratio = +(0.1 + rnd() * 0.85).toFixed(3);
+          /* 現金減資的退還股款要有機會**超過剩餘成本**——那條路是
+             「退還超過成本的部分算已實現損益，不是讓它人間蒸發」。
+             第一版把退還金額壓在 6 元以內，200 本帳本裡幾乎撞不到那個分支，
+             於是把該分支改壞（cost 直接扣、負數 clamp 成 0）時測試照樣全綠。
+             不變量寫對了沒有用，還要真的走到那條路。 */
+          t.price = rnd() < 0.4 ? 0 : (rnd() < 0.5 ? +(rnd() * 6).toFixed(2) : +(rnd() * 400).toFixed(2));
+        }
+        out.push(t);
+      }
+      return out;
+    };
+    const genCorp = txns => {
+      const ev = [], days = txns.filter(t => t.date).map(t => String(t.date).slice(0,10));
+      for (let i = 0, n = int(0, 2); i < n; i++) {
+        const d = (days.length && rnd() < 0.5) ? pick(days) : dateAt(int(0, SPAN));
+        const before = +(rnd() * 200 + 10).toFixed(2);
+        if (rnd() < 0.5) ev.push({ date:d, kind:'cut', before, after:+(before/(0.2+rnd()*0.75)).toFixed(2),
+                                   reason: rnd() < 0.5 ? '減資彌補虧損' : '現金減資退還股款' });
+        else ev.push({ date:d, kind:'div', type:pick(['息','權','權息']), before,
+                       after:+(before*(0.85+rnd()*0.1)).toFixed(2), amt:+(rnd()*5).toFixed(2) });
+      }
+      return ev;
+    };
+
+    const S = () => state.watchlist.find(x => x.id === '2330');
+    const SER = (() => { const a = [], t = new Date(Date.parse(todayISO() + 'T00:00:00'));
+      for (let i = 900; i >= 0; i--) a.push({ date:new Date(t - i*86400000).toISOString().slice(0,10), close:100 });
+      return a; })();
+    /* 每一本亂數帳本都做在一個獨立的假物件上，正式的 watchlist 完全不碰。
+       唯一的例外是下面 I5（存檔往返），那條的受測對象就是 snapshot／applySnapshot 本身。 */
+    const load = (txns, corp) => {
+      const s = { id:'2330', name:'（自我測試用）', ind:'半導體',
+                  inWatch:true, txnsMigrated:true, txnHide:[], txns: JSON.parse(JSON.stringify(txns)) };
+      applyStockData(s, { price:100, eps:5, debt:.3, series:SER, asOf:todayISO(), per:20,
+        perHist:[10,20,30], perAsOf:todayISO(), corpEvents: corp ? JSON.parse(JSON.stringify(corp)) : [] }, 'live');
+      applyPosition(s);
+      return s;
+    };
+    /* I5 專用：把假帳本搬進正式的 2330，才驗得到存檔／還原那一條路 */
+    const loadReal = (txns, corp) => {
+      const s = S();
+      s.inWatch = true; s.txnsMigrated = true; s.txnHide = []; s.txns = JSON.parse(JSON.stringify(txns));
+      applyStockData(s, { price:100, eps:5, debt:.3, series:SER, asOf:todayISO(), per:20,
+        perHist:[10,20,30], perAsOf:todayISO(), corpEvents: corp ? JSON.parse(JSON.stringify(corp)) : [] }, 'live');
+      applyPosition(s);
+      return s;
+    };
+    const four = q => ({ shares:q.shares, cost:q.cost, realized:q.realized, divCash:q.divCash });
+    const fin = v => typeof v === 'number' && isFinite(v);
+    const same = (a, b) => Math.abs(a.shares-b.shares) < 1e-6 && Math.abs(a.cost-b.cost) < 1e-3
+                        && Math.abs(a.realized-b.realized) < 1e-3 && Math.abs(a.divCash-b.divCash) < 1e-3;
+
+    const bad = [];
+    for (let r = 0; r < rounds; r++) {
+      const txns = gen(), corp = genCorp(txns);
+      let s, q, pos;
+      try { s = load(txns, corp); pos = positionOf(s); q = four(pos); }
+      catch (e) { bad.push('I1 丟出例外：' + (e && e.message)); continue; }
+
+      if (!fin(q.shares) || !fin(q.cost) || !fin(q.realized) || !fin(q.divCash))
+        bad.push('I2 出現 NaN／Infinity：' + JSON.stringify(q));
+      if (q.shares < -1e-9) bad.push('I3 股數是負的：' + q.shares);
+      if (q.cost < -1e-6)   bad.push('I3 成本是負的：' + q.cost);
+      if (Math.abs(q.shares) < 1e-9 && Math.abs(q.cost) > 1e-3) bad.push('I3 賣光了但成本沒歸零：' + q.cost);
+
+      /* I4：只有「沒有警告」的帳本才要求順序無關。
+         平均成本法下同一天的兩筆賣出本來可以交換，除非股數不夠賣被砍掉一筆，
+         而那種帳本一定會跳「你是不是漏記了買進」。 */
+      if (!pos.problems.length) {
+        const sh = txns.slice();
+        for (let i = sh.length - 1; i > 0; i--) { const j = Math.floor(rnd()*(i+1)); const t = sh[i]; sh[i] = sh[j]; sh[j] = t; }
+        try { if (!same(q, four(positionOf(load(sh, corp))))) bad.push('I4 順序打亂後結果不同'); }
+        catch (e) { bad.push('I4 丟出例外：' + (e && e.message)); }
+      }
+
+      /* I5：存檔往返 */
+      try {
+        loadReal(txns, corp);
+        const snap = JSON.parse(JSON.stringify(snapshot()));
+        const b1 = four(positionOf(S()));
+        state.watchlist.forEach(x => { x.inWatch = false; x.txns = []; applyPosition(x); });
+        applySnapshot(snap, { trusted:true });
+        applyPosition(S());
+        if (!same(b1, four(positionOf(S())))) bad.push('I5 存檔往返後數字變了');
+      } catch (e) { bad.push('I5 丟出例外：' + (e && e.message)); }
+
+      /* I6：現金守恆。用帳本標回來的實際金額（_usedShares／_cash），
+         不重算任何攤提，所以這條跟被測邏輯是獨立的。 */
+      try {
+        const s2 = load(txns, corp); const p2 = positionOf(s2);
+        let out = 0, inn = 0, skip = false;
+        for (const t of p2.txns) {
+          if (t.kind === 'buy') {
+            const n = t._usedShares != null ? t._usedShares : 0, amt = n * (+t.price || 0);
+            if (amt > 0) out += amt + (t.fee != null ? +t.fee : txnFee(amt));
+          } else if (t.kind === 'sell') {
+            const n = t._usedShares != null ? t._usedShares : 0, amt = n * (+t.price || 0);
+            if (amt > 0) inn += amt - (t.fee != null ? +t.fee : txnFee(amt))
+                              - (t.tax != null ? +t.tax : Math.round(amt * txnTaxRate(s2.id)));
+          } else if (t.kind === 'div' || t.kind === 'reduce') {
+            if (t._cash == null) { skip = true; break; }      // 沒有標回金額就不驗（不猜）
+            inn += t._cash;
+          } else if (t.kind === 'mixed') { skip = true; break; }   // 官方只給合計，本來就分不出來
+        }
+        if (!skip) {
+          const lhs = out - inn, rhs = p2.cost - p2.realized - p2.divCash;
+          if (Math.abs(lhs - rhs) > 1)
+            bad.push(`I6 現金不守恆：付出−收到 ${lhs.toFixed(2)}　vs　剩餘成本−已實現−股利 ${rhs.toFixed(2)}`);
+        }
+      } catch (e) { bad.push('I6 丟出例外：' + (e && e.message)); }
+
+      /* I7：同一天、同一件事只能算一次（自己補的 ＋ 官方的） */
+      if (corp.length) {
+        try {
+          const dayOf = t => String(t.date).slice(0,10);
+          const mineC = new Set(txns.filter(t => ['reduce','stkdiv','div'].includes(t.kind) && t.date).map(t => t.kind + '@' + dayOf(t)));
+          /* 「同一天」不等於「同一件事」：同一個除權息基準日可以同時配現金與配股。
+             要先把官方事件翻譯成它實際會產生的那一種再比對。 */
+          const produced = e => {
+            if (e.kind === 'cut') return 'reduce';
+            const ty = String(e.type || '');
+            if (/^\s*息\s*$/.test(ty)) return 'div';
+            if (/權/.test(ty) && !/息/.test(ty)) return 'stkdiv';
+            return 'mixed';
+          };
+          const dup = corp.filter(e => { const d = dayOf(e), k = produced(e);
+            return k === 'mixed' ? (mineC.has('stkdiv@'+d) || mineC.has('div@'+d)) : mineC.has(k+'@'+d); });
+          if (dup.length) {
+            const w0 = four(positionOf(load(txns, corp.filter(e => !dup.includes(e)))));
+            const w1 = four(positionOf(load(txns, corp)));
+            if (!same(w0, w1)) bad.push('I7 官方重複的公司行為被算了第二次');
+          }
+        } catch (e) { bad.push('I7 丟出例外：' + (e && e.message)); }
+      }
+    }
+    return [...new Set(bad)];
+  }
+
+
   /* ── 跑完之後畫出來 ── */
   const out = [];
   for(const r of rows){
@@ -10586,6 +10832,24 @@ T('TC-014', '拿不到官方股價淨值比時，不可以假設面額 10 元', 
     res.status = res.ok ? 'PASS' : 'FAIL';
     out.push(Object.assign({ id:r.id, name:r.name }, res));
   }
+  /* 不變量檢查跟上面那些 TC 併在同一份結果裡——
+     對使用者來說「有沒有壞」只有一個答案，不該分成兩張表各說各話。 */
+  /* 固定種子 ＝ 每次結果一樣，適合當回歸基準。
+     缺點是「永遠只測同樣的 200 本」，所以另外提供一顆隨機種子的探索按鈕（見下）。 */
+  const ROUNDS = 200, SEED = 20260819;
+  let invBad = [];
+  try{ invBad = runInvariants(ROUNDS, SEED); }
+  catch(e){ invBad = ['不變量檢查本身丟出例外：' + (e && e.message)]; }
+  out.push({ id:'INV', name:`不變量檢查：${ROUNDS} 本亂數帳本（買、部分賣、全賣、再買、配股、配息、減資、同日事件、日期不詳、官方與自己補的公司行為相撞）`,
+             input:`亂數生成 ${ROUNDS} 本帳本（固定種子，同一份檔案每次結果一樣）`,
+             call:'positionOf() / allTxns() / snapshot() / applySnapshot()',
+             expect:'I1 不丟例外　I2 沒有 NaN　I3 股數與成本不為負　I4 沒有警告的帳本順序無關　I5 存檔往返不變　I6 現金守恆　I7 公司行為不重複計算',
+             actual: (invBad.length ? invBad.slice(0,6).join('　／　') : `${ROUNDS} 本全部通過`) + `（種子 ${SEED}）`,
+             ok: invBad.length === 0,
+             why:'I6 是最有力的一條：用錢的進出直接對帳（付出去的錢 − 收到的錢 ＝ 剩餘成本 − 已實現損益 − 現金股利），'
+               + '式子裡沒有平均成本也沒有攤提，任何攤提、比例或順序的錯都會讓等號不成立。',
+             status: invBad.length ? 'FAIL' : 'PASS' });
+
   const pass = out.filter(x=>x.status==='PASS').length;
   const bad  = out.length - pass;
 
@@ -10630,10 +10894,76 @@ T('TC-014', '拿不到官方股價淨值比時，不可以假設面額 10 元', 
      <div style="margin-top:14px">
        <button id="selftestClose" style="font:inherit;padding:10px 16px;border-radius:9px;
          border:1px solid #475569;background:#1e293b;color:#e2e8f0;min-height:44px">回到儀表板（重新整理）</button>
+       <button id="selftestMore" style="font:inherit;padding:10px 16px;border-radius:9px;margin-left:8px;
+         border:1px solid #475569;background:#1e293b;color:#e2e8f0;min-height:44px">再跑 2000 本（隨機種子）</button>
+     </div>
+     <div id="selftestMoreOut" style="margin-top:10px;font-size:14px;color:#94a3b8"></div>
+     <div style="margin-top:10px;font-size:12.5px;color:#64748b;line-height:1.7">
+       上面那 200 本用的是<strong style="color:#94a3b8">固定種子</strong>，每次結果一樣，所以適合拿來比較「這一版有沒有比上一版壞」。
+       但它永遠只測同樣的 200 本。「再跑 2000 本」用的是<strong style="color:#94a3b8">隨機種子</strong>，
+       負責找新東西；萬一紅了，畫面會把那個種子印出來，回報時把它一起貼給我，
+       我就能重現同一批帳本，修好之後再把那個種子固定成新的回歸案例。
      </div>`;
   document.body.appendChild(box);
   const cl = document.getElementById('selftestClose');
   if(cl) cl.addEventListener('click', ()=>{ location.hash = ''; location.reload(); });
+  const mo = document.getElementById('selftestMore'), moOut = document.getElementById('selftestMoreOut');
+  if(mo) mo.addEventListener('click', ()=>{
+    const sd = (Math.floor(Math.random() * 4294967295) >>> 0);
+    /* 2000 本一口氣跑要一分半，中間畫面完全凍住、沒有任何回饋——
+       那跟當掉在使用者眼裡是同一件事。切成一批一批跑，每批之間把控制權交還瀏覽器，
+       順便把進度畫出來。同一顆種子照樣可重現：每一批的起始種子是算出來的，不是隨機的。 */
+    mo.disabled = true;
+    const TOTAL = 2000, STEP = 200;
+    let done = 0, bad = [];
+    const tick = ()=>{
+      if(done >= TOTAL || bad.length){ finish(); return; }
+      moOut.innerHTML = `跑 ${TOTAL} 本中…　<strong style="color:#cbd5e1">${done} / ${TOTAL}</strong>`
+                      + `<span style="color:#64748b">（種子 ${sd}）</span>`;
+      setTimeout(()=>{
+        try{
+          /* 每一批用「種子 ＋ 已完成本數」當起始，整體仍然由 sd 完全決定 */
+          bad = bad.concat(runInvariants(Math.min(STEP, TOTAL - done), (sd + done) >>> 0));
+        }catch(e){ bad = ['不變量檢查本身丟出例外：' + (e && e.message)]; }
+        done += STEP;
+        tick();
+      }, 20);
+    };
+    const finish = ()=>{
+      bad = [...new Set(bad)];
+      moOut.innerHTML = bad.length
+        ? `<span style="color:#fb7185;font-weight:800">❌ 2000 本裡有違反不變量的：</span><br>`
+          + `<span style="color:#fb7185;font-weight:800;font-family:ui-monospace,Menlo,monospace">FAIL seed = ${sd}</span><br>`
+          + `<span style="color:#cbd5e1">${esc(bad.slice(0,8).join('　／　'))}</span><br>`
+          + `<span style="color:#94a3b8">把上面那一行 seed 一起回報，就能重現同一批帳本。</span>`
+        : `<span style="color:#4ade80;font-weight:800">✅ ${TOTAL} 本全部通過</span>`
+          + `<span style="color:#64748b">（種子 ${sd}）</span>`;
+      mo.disabled = false;
+    };
+    setTimeout(tick, 30);
+  });
+
+  }finally{
+    /* 不管測試中途出了什麼事，這裡一定把正式狀態放回去。
+       用 id 對回原本那一份物件，不換掉 watchlist 這個陣列本身——
+       畫面上有地方持有那個陣列的參照，整個換掉會讓它們指到舊的。 */
+    try{
+      const by = {}; _watch0.forEach(w => { by[w.id] = w; });
+      state.watchlist.forEach(x => { const w = by[x.id]; if(w) Object.assign(x, w); });
+      state.autoSave = _autoSave0; state.privacy = _priv0;
+      state.selected = _sel0; state.txnStock = _txn0;
+      state._selftest = false;
+      state.watchlist.forEach(applyPosition);
+      renderAll();
+    }catch(e){ console.error('自我測試還原失敗：', e); }
+    /* ══ 這一段的驗證方式（2026-08-19 實跑）══
+       情境：先在記憶體裡做出「他的」持股（2330 1,234 股、2317 500 股），
+       然後**不重新整理**，直接按「自我測試」，跑完把測試畫面直接移除
+       ——也就是使用者用上一頁返回、或只是把畫面關掉的那條路。
+       比對整份 watchlist（每一檔的 inWatch、交易筆數、結算股數）＋ autoSave ＋ privacy：
+         結果：完全相同，_selftest 也回到 false。
+       變異驗證：把上面那兩行還原拿掉 → 比對結果變成「不同」，抓得到。 */
+  }
 }
 /* hashchange 也要接：使用者最自然的動作是「在網址列最後面加上 #selftest 再按 Enter」，
    而只改 hash 的話瀏覽器**不會重新載入頁面**——沒有這一行，他按了 Enter 什麼事都不會發生，
