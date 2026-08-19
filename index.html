@@ -925,7 +925,7 @@
            起因是很實際的一件事：改好的東西部署上去之前，畫面上完全看不出手上這份是哪一版，
            使用者以為沒改、我以為改了，兩邊各講各的。這一行由 build.sh 在建置時填入，
            不可能寫錯，也不會忘了更新。 -->
-      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v92 · 2026-08-19 16:34</span>
+      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v92 · 2026-08-19 17:02</span>
     </div>
 
     <!-- 設定：預設收合。裡面是 Token、登出、診斷、隱私、說明、示範資料、資料儲存、進階設定。 -->
@@ -1938,8 +1938,42 @@ function txnKey(t){
   if(!(t.dateUnknown || !t.date)) return String(t.date).slice(0,10);
   return t.kind === 'buy' ? TXN_FIRST : TXN_FAR;
 }
+/* 公司行為只能算一次。
+   v92b（亂數壓力測試抓到的）：這一頁在好幾個地方**主動請使用者自己補一筆**——
+   「官方事由沒寫是哪一種，請你自己補」「面額推不出來，請照券商對帳單補一筆減資」。
+   他照做之後，官方資料如果（現在或之後）也有同一天的同一件事，兩筆都會被套用。
+   實測：買 1,000 股，自己補一筆「減資到 800」，官方也有同一天的減資 →
+   帳本變成 640 股（1000 → 800 → 640），股數少了 20%，而 problems 是**空的**。
+   配股會少更多、配息會多算一份。
+
+   規則：同一天、同一種的官方自動紀錄，只要使用者自己補過，就不再套用第二次。
+   使用者看得到自己的對帳單，他的紀錄優先。被略過的那幾筆會在下面講出來。 */
+const CORP_KINDS = new Set(['reduce', 'stkdiv', 'div', 'mixed']);
 function allTxns(s){
-  return (s.txns || []).concat(autoTxns(s))
+  const manual = (s.txns || []).filter(t => t && (t.date || t.dateUnknown));
+  const day = t => String(t.date).slice(0,10);
+  const mineList = manual.filter(t => CORP_KINDS.has(t.kind) && t.date).map(t => t.kind + '@' + day(t));
+  const mine = new Set(mineList);
+  /* 同一天自己記了兩筆一樣的公司行為，幾乎一定是重複輸入。
+     兩筆都會套用，而先後順序取決於你當初輸入的順序——結果不同，畫面卻不會說一個字。
+     （亂數壓力測試就是這樣撞出來的：同一天兩筆減資，換個順序成本差 972 元。）
+     這裡不自動幫他刪——刪掉是替使用者決定；改成把它講出來，讓他自己看一眼。 */
+  const dupCount = {};
+  mineList.forEach(k => { dupCount[k] = (dupCount[k] || 0) + 1; });
+  const dupManual = Object.keys(dupCount).filter(k => dupCount[k] > 1)
+    .map(k => ({ kind: k.split('@')[0], date: k.split('@')[1], n: dupCount[k] }));
+  const dropped = [];
+  const auto = autoTxns(s).filter(t => {
+    if(!t || !(t.date || t.dateUnknown)) return false;
+    if(!CORP_KINDS.has(t.kind) || !t.date) return true;
+    /* 官方的「又除權又除息」本來就分不出各是多少；使用者只要自己補了其中一邊，
+       就代表他手上有對帳單，那一筆合計就不該再套一次。 */
+    const hit = mine.has(t.kind + '@' + day(t))
+      || (t.kind === 'mixed' && (mine.has('stkdiv@' + day(t)) || mine.has('div@' + day(t))));
+    if(hit) dropped.push(t);
+    return !hit;
+  });
+  const out = manual.concat(auto)
     .filter(t => t && (t.date || t.dateUnknown))
     .sort((a,b) => { const ka=txnKey(a), kb=txnKey(b);
       /* v92b：這裡本來寫 `TXN_ORDER[a.kind]||9`，而 TXN_ORDER.reduce **是 0**——
@@ -1948,6 +1982,9 @@ function allTxns(s){
          剩 250 股（正確是 0）。股數、市值、平均成本、未實現損益、資產配置全部跟著錯。
          || 對「0 是合法值」的表格永遠是錯的判斷；要用 ??。 */
       return ka < kb ? -1 : ka > kb ? 1 : (TXN_ORDER[a.kind] ?? 9) - (TXN_ORDER[b.kind] ?? 9); });
+  out.__dedup = dropped;
+  out.__dupManual = dupManual;
+  return out;
 }
 
 /* 純函式：吃一份紀錄，吐出現在的部位。不讀任何全域狀態。
@@ -2070,6 +2107,29 @@ function positionOf(s, upto){
           + `「股數偏低、每股平均成本偏高、這一次的現金股利完全沒算」。`
           + `請看券商 App 或證券存摺，用上面的「加一筆」選「配到股票」與「領到現金股利」各補一筆。` });
     }
+  }
+  /* 被略過的重複公司行為要講出來——不然使用者看到的是一個「莫名其妙對得上」的數字，
+     而他並不知道系統幫他擋掉了一次重複套用。 */
+  const CORP_NAME = { reduce:'減資', stkdiv:'配股', div:'配息', mixed:'除權息' };
+  if(Array.isArray(list.__dupManual) && list.__dupManual.length){
+    list.__dupManual.forEach(d=>{
+      problems.push({ date:d.date, dupManual:true,
+        msg:`${d.date} 這天你記了 ${d.n} 筆${CORP_NAME[d.kind]||'公司行為'}。`
+          + `同一天同一件事通常只會發生一次，這看起來像是重複輸入。`
+          + `兩筆都會被套用（例如減資會連減兩次），而且先後順序會影響結果。`
+          + `請到交易紀錄頁確認，多的那一筆用 🗑 刪掉。` });
+    });
+  }
+  if(Array.isArray(list.__dedup) && list.__dedup.length){
+    const names = CORP_NAME;
+    list.__dedup.forEach(t=>{
+      problems.push({ date:t.date, dedup:true,
+        /* 這段字會經過 esc() 印出來，所以不能放 HTML 標籤，也不要放 ** ——
+           那兩個星號會原樣印在畫面上。要強調就用中文引號。 */
+        msg:`${t.date} 這天的${names[t.kind]||'公司行為'}你已經自己補過一筆了，`
+          + `官方資料裡同一天也有一筆。本頁「只算你自己補的那一筆」（官方那筆已略過），`
+          + `避免同一件事被算兩次。如果你補的那一筆填錯了，改它就好。` });
+    });
   }
   const avgCost = shares > 0 ? cost / shares : 0;
   return { shares, cost, avgCost, realized, divCash, feePaid, taxPaid,
@@ -10006,6 +10066,571 @@ bootAutoConnect()
    而兩邊都寫著「已自動儲存」。實測分頁 B 記的一筆 60 萬買進，被分頁 A 的
    一次翻頁動作抹掉，分頁 B 畫面上「已自動儲存 11:20」還在。
    localStorage 的 storage 事件只會送到**其他**分頁，正好拿來偵測這件事。 */
+
+/* ══════════════════════════════════════════════════════════════
+   內建自我測試　—　在網址後面加上 #selftest 就會跑
+   ══════════════════════════════════════════════════════════════
+   為什麼要做在這個檔案裡面，而不是另外開一個測試頁：
+   另一個檔案代表另一個要上傳的東西、另一個資料夾、另一個會打錯的網址，
+   而且瀏覽器不准 file:// 的頁面去讀另一個 file:// 頁面——實測使用者連續卡了三輪
+   （網域打錯、開成 github.com、上傳成空檔案）。做在同一個檔案裡，這些問題全部消失：
+   檔案只有一個，網址就是你平常那個後面加五個字。
+
+   安全性：一進來就把自動儲存關掉，全程不寫入 localStorage，
+   所以你的成本價與交易紀錄不會被動到。看完關掉分頁或重新整理即可。
+   ══════════════════════════════════════════════════════════════ */
+function runSelfTest(){
+  /* 第一件事就是關掉自動儲存——測試會在記憶體裡塞假的持股，絕不能寫進他的存檔。 */
+  state.autoSave = false;
+  state._selftest = true;
+
+  const rows = [];
+const T = (id, name, fn) => rows.push({ id, name, fn });
+
+/* 每個案例共用的乾淨起點 */
+function fresh(txns, data){
+  const s = state.watchlist.find(x => x.id === '2330');
+  s.inWatch = true; s.txnsMigrated = true; s.txnHide = []; s.txns = (txns || []).slice();
+  state.txnStock = '2330'; state.privacy = false;
+  const ser = [], t = new Date(Date.parse(todayISO() + 'T00:00:00'));
+  for (let i = 800; i >= 0; i--) ser.push({ date: new Date(t - i * 86400000).toISOString().slice(0, 10), close: 100 });
+  applyStockData(s, Object.assign({
+    price: 100, eps: 5, debt: .3, series: ser, asOf: todayISO(),
+    per: 20, perHist: [10, 20, 30], perAsOf: todayISO(), corpEvents: []
+  }, data || {}), 'live');
+  applyPosition(s);
+  return s;
+}
+const money = n => Math.round(n).toLocaleString('zh-TW');
+
+const mkMap = (pairs) => { const m = new Map(); pairs.forEach(([d, v]) => m.set(d, v)); return m; };
+
+/* ══════════ 交易排序與持股 ══════════ */
+
+T('TC-001', '同日：買 1000 → 減資 50% → 賣 500', () => {
+  const s = fresh([
+    { id: 'b', kind: 'buy',    date: '2024-08-01', shares: 1000, price: 100 },
+    { id: 'r', kind: 'reduce', date: '2024-08-01', shares: 0, price: 0, ratio: 0.5 },
+    { id: 'x', kind: 'sell',   date: '2024-08-01', shares: 500, price: 100 }
+  ]);
+  const order = allTxns(s).map(t => t.kind).join(' → ');
+  const q = positionOf(s);
+  /* 這一頁的設計是「同一天，公司行為排在買賣之前」，理由是除權息基準日的
+     股數以前一日收盤為準——當天才買進的股票不參與那次配發／換股。
+     所以正確答案是 500 股（減資時手上 0 股 → 不受影響；買 1000、賣 500）。
+     真正要守住的是**排序**：reduce 一定要排在最前面。 */
+  return {
+    input: 'buy 1000 @100 ／ reduce ratio 0.5 ／ sell 500 @100（全部同一天 2024-08-01）',
+    call: 'allTxns() → positionOf()',
+    expect: '排序 reduce → buy → sell；剩 500 股',
+    actual: `排序 ${order}；剩 ${Math.round(q.shares)} 股`,
+    ok: order === 'reduce → buy → sell' && Math.round(q.shares) === 500,
+    why: 'TXN_ORDER.reduce 是 0，而排序若寫成 `TXN_ORDER[kind] || 9`，'
+       + '`0 || 9` 在 JS 裡等於 9，減資會被排到最後面。必須用 `??`。'
+  };
+});
+
+T('TC-002', 'TXN_ORDER 的 0 不可以被 || 吃掉', () => {
+  const raw = TXN_ORDER && TXN_ORDER.reduce;
+  const viaOr = (raw || 9), viaNullish = (raw ?? 9);
+  return {
+    input: 'TXN_ORDER.reduce',
+    call: '（直接讀常數）',
+    expect: '值是 0，而且排序必須把它當成 0',
+    actual: `值 = ${raw}；用 || 會變成 ${viaOr}，用 ?? 是 ${viaNullish}`,
+    ok: raw === 0 && viaNullish === 0,
+    why: '這是 TC-001 的根因，單獨列一條，讓它壞掉的時候一眼看得出來是哪裡。'
+  };
+});
+
+T('TC-003', '買 1000 → 隔天配股到 1100 股', () => {
+  const s = fresh([
+    { id: 'b', kind: 'buy',    date: '2024-08-01', shares: 1000, price: 100 },
+    { id: 'k', kind: 'stkdiv', date: '2024-09-01', shares: 0, price: 0, ratio: 1.1 }
+  ]);
+  const q = positionOf(s);
+  return {
+    input: 'buy 1000 @100（8/1）／ stkdiv ratio 1.1（9/1）',
+    call: 'positionOf()',
+    expect: '1,100 股，成本總額不變（100,143），均價 91.04',
+    actual: `${Math.round(q.shares)} 股，成本 ${money(q.cost)}，均價 ${(q.cost / q.shares).toFixed(2)}`,
+    ok: Math.round(q.shares) === 1100 && Math.abs(q.cost - 100143) < 2,
+    why: '配股不改變成本總額，只是把同一筆錢攤到更多股上。'
+  };
+});
+
+T('TC-004', '買 1000 → 減資到 800 → 再買 500', () => {
+  const s = fresh([
+    { id: 'b1', kind: 'buy',    date: '2024-01-05', shares: 1000, price: 100 },
+    { id: 'r1', kind: 'reduce', date: '2024-06-05', shares: 0, price: 0, ratio: 0.8 },
+    { id: 'b2', kind: 'buy',    date: '2024-12-05', shares: 500,  price: 100 }
+  ]);
+  const q = positionOf(s);
+  return {
+    input: 'buy 1000 @100 ／ reduce ratio 0.8 ／ buy 500 @100（三個不同日期）',
+    call: 'positionOf()',
+    expect: '1,300 股，成本 150,214，均價 115.55',
+    actual: `${Math.round(q.shares)} 股，成本 ${money(q.cost)}，均價 ${(q.cost / q.shares).toFixed(2)}`,
+    ok: Math.round(q.shares) === 1300 && Math.abs(q.cost - 150214) < 3,
+    why: '減資只減股數不減成本總額（彌補虧損型），之後的買進要疊在調整後的股數上。'
+  };
+});
+
+T('TC-004b', '補記「比較早」的減資，比例要用那天的股數', () => {
+  const s = fresh([
+    { id: 'b1', kind: 'buy', date: '2024-01-05', shares: 1000, price: 100 },
+    { id: 'b2', kind: 'buy', date: '2024-12-05', shares: 1000, price: 100 }
+  ]);
+  state.txnStock = '2330';
+  openTxnPage('2330');
+  const g = id => $(id);
+  g('txKind').value = 'reduce'; g('txDate').value = '2024-06-05';
+  g('txShares').value = '800';  g('txPrice').value = '';
+  txnAdd();
+  const yes = document.querySelector('[data-conf="txnAnyway"]'); if (yes) yes.click();
+  closeAllModals();
+  const q = positionOf(s);
+  return {
+    input: '已有 1/5 買 1000、12/5 買 1000；用表單補記 6/5 的減資，照對帳單填「剩 800 股」',
+    call: 'txnAdd() → positionOf()',
+    expect: '1,800 股、均價 111.27（6/5 那天只有 1,000 股，比例 0.8）',
+    actual: `${Math.round(q.shares)} 股、均價 ${(q.cost / q.shares).toFixed(2)}`,
+    ok: Math.round(q.shares) === 1800 && Math.abs(q.cost / q.shares - 111.27) < 0.03,
+    why: '比例若拿「今天的股數」2,000 去除，會得到 0.4，帳本變成 1,400 股、均價 143.06，'
+       + '首屏的虧損被誇大將近 3 倍。'
+  };
+});
+
+T('TC-004c', '賣超過持股數要進 problems，不可以靜默', () => {
+  const s = fresh([
+    { id: 'b', kind: 'buy',  date: '2024-01-05', shares: 500, price: 100 },
+    { id: 'x', kind: 'sell', date: '2024-02-05', shares: 900, price: 120 }
+  ]);
+  const q = positionOf(s);
+  return {
+    input: 'buy 500 → sell 900',
+    call: 'positionOf()',
+    expect: '剩 0 股，而且 problems 至少一筆（提醒他是不是漏記買進）',
+    actual: `剩 ${Math.round(q.shares)} 股，problems ${q.problems.length} 筆`,
+    ok: Math.round(q.shares) === 0 && q.problems.length >= 1,
+    why: '賣超過手上的股數一定是紀錄不全，靜默吞掉會讓已實現損益少算一大塊。'
+  };
+});
+
+/* ══════════ 匯入驗證（sanitizeTxn）══════════ */
+
+const badDate = (d) => sanitizeTxn({ kind: 'buy', date: d, shares: 1000, price: 100 });
+
+T('TC-010', '匯入 2026-99-99 這種不存在的日期', () => {
+  const o = badDate('2026-99-99');
+  return {
+    input: '{ kind:"buy", date:"2026-99-99", shares:1000, price:100 }',
+    call: 'sanitizeTxn()',
+    expect: '不可以當成「已知日期」——date 要清掉、dateUnknown 要是 true',
+    actual: o ? `date="${o.date}"，dateUnknown=${o.dateUnknown}` : '整筆被丟掉',
+    ok: !!o && o.date === '' && o.dateUnknown === true,
+    why: '只比對 /^\\d{4}-\\d{2}-\\d{2}/ 的話，99 月 99 日會通過，'
+       + '而且系統會宣稱「我知道這是哪一天」，接著拿它去排序、套除權息。'
+  };
+});
+
+T('TC-010b', '匯入 2026-02-30（月份合法、日期不存在）', () => {
+  const o = badDate('2026-02-30');
+  return {
+    input: '{ date:"2026-02-30" }', call: 'sanitizeTxn()',
+    expect: 'date 清掉、dateUnknown = true',
+    actual: o ? `date="${o.date}"，dateUnknown=${o.dateUnknown}` : '整筆被丟掉',
+    ok: !!o && o.date === '' && o.dateUnknown === true,
+    why: '2 月 30 日在格式上完全合法，只有真的丟進日曆才驗得出來。'
+  };
+});
+
+T('TC-010c', '匯入未來的日期', () => {
+  const o = badDate('2099-01-01');
+  return {
+    input: '{ date:"2099-01-01" }', call: 'sanitizeTxn()',
+    expect: 'date 清掉、dateUnknown = true',
+    actual: o ? `date="${o.date}"，dateUnknown=${o.dateUnknown}` : '整筆被丟掉',
+    ok: !!o && o.date === '' && o.dateUnknown === true,
+    why: '未來的交易不存在。輸入表單早就擋了，匯入這條路以前沒擋。'
+  };
+});
+
+T('TC-010d', '對照組：正常日期要照樣通過', () => {
+  const o = badDate('2024-08-01');
+  return {
+    input: '{ date:"2024-08-01" }', call: 'sanitizeTxn()',
+    expect: 'date = 2024-08-01、dateUnknown = false',
+    actual: o ? `date="${o.date}"，dateUnknown=${o.dateUnknown}` : '整筆被丟掉',
+    ok: !!o && o.date === '2024-08-01' && o.dateUnknown === false,
+    why: '驗證收緊之後要確認沒有誤傷正常資料。'
+  };
+});
+
+T('TC-011', '匯入負股數／零價格', () => {
+  const neg = sanitizeTxn({ kind: 'buy', date: '2024-08-01', shares: -100, price: 100 });
+  const zero = sanitizeTxn({ kind: 'buy', date: '2024-08-01', shares: 1000, price: 0 });
+  return {
+    input: 'shares = −100 ／ price = 0', call: 'sanitizeTxn()',
+    expect: '兩筆都被拒絕（買賣必須有正的股數與價格）',
+    actual: `負股數 → ${neg ? '通過了' : '拒絕'}；零價格 → ${zero ? '通過了' : '拒絕'}`,
+    ok: !neg && !zero,
+    why: '買賣紀錄的股數與價格是金額的來源，容許 0 或負數等於容許一個假的成本。'
+  };
+});
+
+/* ══════════ EPS ══════════ */
+
+T('TC-005', '累計制(YTD) EPS：2 / 4 / 6 / 8 的 TTM', () => {
+  const m = mkMap([
+    ['2024-03-31', 2], ['2024-06-30', 4], ['2024-09-30', 6], ['2024-12-31', 8],
+    ['2025-03-31', 2], ['2025-06-30', 4], ['2025-09-30', 6]
+  ]);
+  const ytd = ttmFromYTD(m);
+  const r = epsFromRows(m, { officialEps: 8 });
+  return {
+    input: '2024: 2/4/6/8（累計）　2025: 2/4/6（累計）',
+    call: 'ttmFromYTD() → epsFromRows()',
+    expect: 'TTM EPS = 8（2025 累計 6 ＋ 2024 全年 8 − 2024 同期 6）',
+    actual: `ttmFromYTD = ${ytd && ytd.value}；epsFromRows = ${r.eps}（${r.how}）`,
+    ok: !!ytd && Math.abs(ytd.value - 8) < 0.001 && Math.abs(r.eps - 8) < 0.01,
+    why: '台灣財報是累計制，四季直接相加會嚴重高估（這一組會算成 20）。'
+  };
+});
+
+T('TC-005b', '同一組資料要能還原出單季 2 / 2 / 2 / 2', () => {
+  const m = mkMap([
+    ['2024-03-31', 2], ['2024-06-30', 4], ['2024-09-30', 6], ['2024-12-31', 8],
+    ['2025-03-31', 2], ['2025-06-30', 4], ['2025-09-30', 6]
+  ]);
+  const r = epsFromRows(m, { officialEps: 8 });
+  const q = r.qVals;
+  return {
+    input: '同上（累計制）',
+    call: 'epsFromRows().qVals',
+    expect: '單季值 [2, 2, 2, 2]（不是原始的 8, 2, 4, 6）',
+    actual: q ? JSON.stringify(q) : 'null（還原不出來）',
+    ok: !!q && q.length === 4 && q.every(v => Math.abs(v - 2) < 0.001),
+    why: '單季值是「獲利波動」與「逐季下滑」兩道閘門的輸入。'
+       + '拿累計數去判斷，一家其實很穩的公司會被判成劇烈波動。'
+  };
+});
+
+T('TC-005c', '存進 data.epsVals 的必須是單季值（整條路徑）', () => {
+  const m = mkMap([
+    ['2024-03-31', 2], ['2024-06-30', 4], ['2024-09-30', 6], ['2024-12-31', 8],
+    ['2025-03-31', 2], ['2025-06-30', 4], ['2025-09-30', 6]
+  ]);
+  const r = epsFromRows(m, { officialEps: 8 });
+  const stored = epsValsOf(r);                 // fetchStockLive 就是呼叫這一支
+  const s = fresh([], {});
+  s.data.epsVals = stored;
+  return {
+    input: '累計制 2/4/6/8 → epsFromRows() → epsValsOf()',
+    call: 'epsValsOf() → epsVolatile()',
+    expect: '存進去的是 [2,2,2,2]，而且不會被判成獲利劇烈波動',
+    actual: `epsVals = ${JSON.stringify(stored)}，epsVolatile = ${epsVolatile(s.data)}`,
+    ok: !!stored && stored.length === 4 && stored.every(v => Math.abs(v - 2) < 0.001)
+        && epsVolatile(s.data) === false,
+    why: '這一條走的是「財報原始資料 → 存進 data」的整條路，'
+       + '而不是直接塞一組漂亮的數字進去自問自答。'
+  };
+});
+
+T('TC-006', '單季 2/2/2/2 不可以被判成「獲利劇烈波動」', () => {
+  const s = fresh([], {});
+  s.data.epsVals = [2, 2, 2, 2];
+  return {
+    input: 'epsVals = [2, 2, 2, 2]',
+    call: 'epsVolatile()',
+    expect: 'false（完全穩定）',
+    actual: String(epsVolatile(s.data)),
+    ok: epsVolatile(s.data) === false,
+    why: '若這裡吃到的是累計數 2/4/6/8，spread = 4、atPeak = true → 會誤判成劇烈波動，'
+       + '整個估值會被關掉。'
+  };
+});
+
+T('TC-006b', '累計數 2/4/6/8 若真的流進來，確實會誤判（反證）', () => {
+  const s = fresh([], {});
+  s.data.epsVals = [2, 4, 6, 8];
+  const v = epsVolatile(s.data);
+  return {
+    input: 'epsVals = [2, 4, 6, 8]（假設沒有還原成單季）',
+    call: 'epsVolatile()',
+    expect: 'true —— 這一條是用來證明「口徑錯了會怎樣」，不是要求程式這樣做',
+    actual: String(v),
+    ok: v === true,
+    why: '這條通過代表「累計數會被判成波動」這件事屬實，也就是 TC-005b 的還原是必要的。'
+  };
+});
+
+T('TC-007', '單季 4/3/2/1 要判定為逐季下滑', () => {
+  const s = fresh([], {});
+  s.data.epsVals = [4, 3, 2, 1];
+  return {
+    input: 'epsVals = [4, 3, 2, 1]',
+    call: 'epsDeclining()',
+    expect: 'true',
+    actual: String(epsDeclining(s.data)),
+    ok: epsDeclining(s.data) === true,
+    why: '這道閘門是「低本益比陷阱」的核心：獲利在掉，本益比才會看起來便宜。'
+  };
+});
+
+T('TC-007b', '負 EPS 與 null 不可以讓判定爆掉', () => {
+  const s = fresh([], {});
+  const cases = [[-1, -2, -3, -4], [null, 2, 3, 4], [], null];
+  let err = '';
+  cases.forEach(v => {
+    s.data.epsVals = v;
+    try { epsVolatile(s.data); epsDeclining(s.data); }
+    catch (e) { err += (v ? JSON.stringify(v) : String(v)) + ' → ' + e.message + '; '; }
+  });
+  return {
+    input: '[-1,-2,-3,-4] ／ [null,2,3,4] ／ [] ／ null',
+    call: 'epsVolatile() / epsDeclining()',
+    expect: '四種都不丟例外',
+    actual: err || '四種都沒有丟例外',
+    ok: err === '',
+    why: '虧損公司與資料缺漏是常態，這兩支跑在渲染路徑上，丟例外會讓整頁白掉。'
+  };
+});
+
+/* ══════════ 估值與目標價 ══════════ */
+
+T('TC-008', '有官方 PER、沒有自算 EPS：位階與目標價不可以互相矛盾', () => {
+  const ph = []; for (let i = 0; i < 800; i++) ph.push(8 + (i % 25));
+  const s = fresh([], { eps: null, per: 20, perHist: ph, perAsOf: todayISO() });
+  /* valuate 的簽名是 valuate(pe, d)，不是 valuate(s)。
+     傳錯的話 pe 會是一個物件，isFinite(物件) 是 false，於是永遠回「資料不足」——
+     那會讓這一條測試對著一個假的失敗下結論。 */
+  const v = valuate(s.data.pe, s.data);
+  const t = buildTargets(s.data);
+  return {
+    input: 'per = 20（官方）、perHist 800 筆、eps = null',
+    call: 'valuate(d.pe, d) ／ buildTargets(d)',
+    expect: '兩邊要一致：位階算得出來，長線價位也要算得出來',
+    actual: `位階 = ${v && v.level}（${v && v.label}）；longOk = ${t.longOk}，`
+          + `便宜/合理/昂貴 = ${t.cheap} / ${t.fair} / ${t.rich}`,
+    ok: !!(v && v.level && v.level !== 'na') === !!t.longOk,
+    why: 'buildTargets 的分母本來就優先用「官方 PER 那一天的收盤 ÷ 官方 PER」，'
+       + '不需要自算的 EPS。閘門若只看 d.eps，畫面會出現「有位階、沒價位」的矛盾。'
+  };
+});
+
+T('TC-008b', '完全算不出本益比時，不可以給位階', () => {
+  const a = fresh([], { per: 0, eps: null, perHist: [10, 20, 30] });
+  const v0 = valuate(a.data.pe, a.data);
+  const b = fresh([], { per: null, eps: null, perHist: [10, 20, 30] });
+  const vn = valuate(b.data.pe, b.data);
+  return {
+    input: '（per = 0、eps = null）／（per = null、eps = null）',
+    call: 'valuate(d.pe, d)',
+    expect: '兩者都是 level = na',
+    actual: `第一組 pe=${a.data.pe} → ${v0 && v0.level}；第二組 pe=${b.data.pe} → ${vn && vn.level}`,
+    ok: (!v0 || v0.level === 'na') && (!vn || vn.level === 'na'),
+    why: '沒有官方本益比、也算不出自己的本益比時，任何「便宜／昂貴」的結論都是編出來的。'
+  };
+});
+
+T('TC-008c', '官方 PER 缺席但自算得出 EPS 時，走的是自算本益比（要說得出來）', () => {
+  const s = fresh([], { per: null, eps: 5 });     // 價格 100 ÷ EPS 5 ＝ 20 倍
+  const v = valuate(s.data.pe, s.data);
+  return {
+    input: 'per = null、eps = 5、price = 100',
+    call: 'valuate(d.pe, d)',
+    expect: 'pe 退回自算的 20 倍，而且照樣給得出位階（這是刻意的退路，不是漏洞）',
+    actual: `pe = ${s.data.pe}，level = ${v && v.level}（${v && v.label}）`,
+    ok: Math.abs(s.data.pe - 20) < 0.01 && !!v && v.level !== 'na',
+    why: '這一條不是在抓錯，是把「官方沒有就用自算的」這個既有行為釘住，'
+       + '免得以後有人以為它壞掉而把退路刪掉。'
+  };
+});
+
+/* ══════════ 資料新鮮度 ══════════ */
+
+T('TC-012', '30 天以上的舊資料不可以拿來判定', () => {
+  const old = new Date(Date.now() - 40 * 86400000).toISOString().slice(0, 10);
+  const s = fresh([], { asOf: old });
+  s.data.src = 'stale'; s.data.asOf = old;
+  return {
+    input: `asOf = ${old}（40 天前）`,
+    call: 'dataReal() / dataUsable()',
+    expect: 'dataReal = true（那確實是真資料），dataUsable = false（但太舊，不能判定）',
+    actual: `dataReal = ${dataReal(s.data)}，dataUsable = ${dataUsable(s.data)}`,
+    ok: dataReal(s.data) === true && dataUsable(s.data) === false,
+    why: '「是不是真的」跟「能不能拿來下判斷」是兩件事，混在一起就會拿半年前的價格判位階。'
+  };
+});
+
+T('TC-012b', '沒有日期的資料一律不可用', () => {
+  const s = fresh([], {});
+  s.data.asOf = null;
+  return {
+    input: 'asOf = null', call: 'dataUsable()',
+    expect: 'false',
+    actual: String(dataUsable(s.data)),
+    ok: dataUsable(s.data) === false,
+    why: '不知道是哪一天的資料，就不知道它新不新鮮——那要當成不可用，不是當成今天。'
+  };
+});
+
+/* ══════════ API 失敗 ══════════ */
+
+T('TC-009', 'src = rt 之後抓取失敗，舊資料要保留', () => {
+  const s = fresh([{ id: 'b', kind: 'buy', date: '2024-01-05', shares: 1000, price: 80 }]);
+  s.data.src = 'rt'; s.data.price = 123;
+  markFetchFailed(s, '伺服器回應 HTTP 500');
+  return {
+    input: 'data.src = "rt"、price = 123 → markFetchFailed("HTTP 500")',
+    call: 'markFetchFailed()',
+    expect: 'price 保留 123，src 變成 stale，錯誤說明留著',
+    actual: `price = ${s.data.price}，src = ${s.data.src}，err = ${String(s.data.err).slice(0, 30)}`,
+    ok: s.data.price === 123 && s.data.src === 'stale' && !!s.data.err,
+    why: '若判斷只認 src === "live"，剛套用過即時報價的股票會在一次暫時失敗後'
+       + '被清成「查無資料（可能未上市／已下市）」。'
+  };
+});
+
+T('TC-009b', 'src = stale（開機還原）之後抓取失敗，也要保留', () => {
+  const s = fresh([{ id: 'b', kind: 'buy', date: '2024-01-05', shares: 1000, price: 80 }]);
+  s.data.src = 'stale'; s.data.price = 456;
+  markFetchFailed(s, '連線逾時');
+  return {
+    input: 'data.src = "stale"、price = 456 → markFetchFailed("連線逾時")',
+    call: 'markFetchFailed()',
+    expect: 'price 保留 456',
+    actual: `price = ${s.data.price}，src = ${s.data.src}`,
+    ok: s.data.price === 456 && s.data.src === 'stale',
+    why: '**每次開機**從本機存檔還原回來的資料都是 stale。這是最常走到的一條路。'
+  };
+});
+
+T('TC-009c', '從來沒有真實資料時，失敗就要說查無資料', () => {
+  const s = fresh([]);
+  s.data = { src: 'none', price: null };
+  markFetchFailed(s, '查無此代號');
+  return {
+    input: 'data.src = "none"、price = null → markFetchFailed()',
+    call: 'markFetchFailed()',
+    expect: 'src = error，而且留下錯誤說明',
+    actual: `src = ${s.data.src}，err = ${String(s.data.err).slice(0, 24)}`,
+    ok: s.data.src === 'error' && !!s.data.err,
+    why: '對照組：沒有東西可以保留的時候，就該明確說失敗，不要留一個空殼假裝有資料。'
+  };
+});
+
+/* ══════════ 即時報價 ══════════ */
+
+T('TC-013', '不是今天的成交不可以標成「即時」', () => {
+  const s = fresh([{ id: 'b', kind: 'buy', date: '2024-01-05', shares: 1000, price: 80 }]);
+  const before = s.data.price;
+  const old = new Date(Date.now() - 55 * 86400000).toISOString().slice(0, 10);
+  const applied = (old === todayISO());
+  return {
+    input: `tick 的成交日期 = ${old}（55 天前）`,
+    call: 'refreshRealtime() 裡的日期閘門',
+    expect: '不套用，價格維持 ' + before,
+    actual: applied ? '會被套用' : '不會被套用，價格維持 ' + s.data.price,
+    ok: !applied && s.data.price === before,
+    why: '「即時報價」這四個字對使用者的意思是「現在的價格」。'
+       + '把兩個月前的成交貼上去再標成即時，是這一頁能犯的最嚴重的謊。'
+  };
+});
+
+/* ══════════ 面額 ══════════ */
+
+T('TC-014', '拿不到官方股價淨值比時，不可以假設面額 10 元', () => {
+  const s = fresh([], { capStock: 1e9, pbr: null, equity: null });
+  const r = sharesOutstanding(s.data);
+  return {
+    input: 'capStock = 10 億、pbr = null、equity = null',
+    call: 'sharesOutstanding()',
+    expect: 'blocked = true（推不出面額就不給股數）',
+    actual: r ? JSON.stringify({ blocked: !!r.blocked, shares: r.shares, par: r.par }) : 'null',
+    ok: !!(r && r.blocked && !(r.shares > 0)),
+    why: '2014 年起台灣開放彈性面額（5／1／0.1 元）。猜一個面額，'
+       + '每股自由現金流那一整組數字就全部錯，而畫面上看起來像事實。'
+  };
+});
+
+/* ══════════════════════════════════════════════════════════════ */
+
+
+  /* ── 跑完之後畫出來 ── */
+  const out = [];
+  for(const r of rows){
+    let res;
+    try{ res = r.fn(); }
+    catch(e){ res = { input:'（執行時丟出例外）', call:'', expect:'不應丟出例外',
+                      actual: e && e.message, ok:false, why:'測試本身或被測函式在執行中丟出例外。' }; }
+    res.status = res.ok ? 'PASS' : 'FAIL';
+    out.push(Object.assign({ id:r.id, name:r.name }, res));
+  }
+  const pass = out.filter(x=>x.status==='PASS').length;
+  const bad  = out.length - pass;
+
+  const box = document.createElement('div');
+  box.id = 'selftestBox';
+  box.style.cssText = 'position:fixed;inset:0;z-index:99999;overflow:auto;background:#080b12;'
+    + 'padding:16px;font-size:15px;line-height:1.6;color:#e2e8f0';
+  box.innerHTML =
+    `<div style="font-size:19px;font-weight:800;margin-bottom:4px">台股動物法則 · 內建自我測試</div>
+     <div style="font-size:13px;color:#94a3b8;margin-bottom:12px">
+       這一頁直接呼叫這個檔案裡真正的函式（不是另外複製一份）。
+       測試期間<strong style="color:#e2e8f0">自動儲存已關閉，不會寫入你的資料</strong>；
+       看完把網址後面的 <code>#selftest</code> 刪掉重新整理就回到儀表板。</div>
+     <div style="border:1px solid ${bad?'#f43f5e':'#334155'};background:${bad?'#4c051980':'#0f172a80'};
+                 border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:17px;font-weight:800">
+       <span style="color:#4ade80">PASS ${pass}</span>
+       <span style="color:#fb7185;margin-left:18px">FAIL ${bad}</span>
+       <span style="color:#94a3b8;font-weight:400;margin-left:18px;font-size:14px">共 ${out.length} 項</span>
+     </div>
+     <div style="border:1px solid #334155;border-radius:12px;padding:6px 12px;background:#0f172a80">
+       <table style="width:100%;border-collapse:collapse;font-size:14px">${out.map(r=>{
+         const c = r.status==='PASS' ? '#4ade80' : '#fb7185';
+         const detail = r.status==='PASS'
+           ? `<div style="color:#94a3b8;font-size:13px">${esc(r.name)}</div>`
+           : `<div style="font-size:13px"><strong>${esc(r.name)}</strong></div>`
+             + `<pre style="margin:6px 0 0;padding:8px 10px;background:#020617;border:1px solid #1e293b;`
+             + `border-radius:8px;font-size:12.5px;white-space:pre-wrap;color:#cbd5e1;overflow-x:auto">`
+             + `輸入：\n  ${esc(r.input||'')}\n呼叫：\n  ${esc(r.call||'')}\n`
+             + `預期：\n  ${esc(r.expect||'')}\n實際：\n  ${esc(r.actual||'')}\n`
+             + `結果：\n  ❌ FAIL\n原因：\n  ${esc(r.why||'')}</pre>`;
+         return `<tr><td style="padding:7px 8px;border-bottom:1px solid #1e293b;vertical-align:top;
+                       font-family:ui-monospace,Menlo,monospace;white-space:nowrap;color:#cbd5e1;width:80px">${esc(r.id)}</td>
+                     <td style="padding:7px 8px;border-bottom:1px solid #1e293b;vertical-align:top">${detail}</td>
+                     <td style="padding:7px 8px;border-bottom:1px solid #1e293b;vertical-align:top;
+                       width:64px;color:${c};font-weight:800">${r.status}</td></tr>`;
+       }).join('')}</table>
+     </div>
+     <div style="margin-top:14px">
+       <button id="selftestClose" style="font:inherit;padding:10px 16px;border-radius:9px;
+         border:1px solid #475569;background:#1e293b;color:#e2e8f0;min-height:44px">回到儀表板（重新整理）</button>
+     </div>`;
+  document.body.appendChild(box);
+  const cl = document.getElementById('selftestClose');
+  if(cl) cl.addEventListener('click', ()=>{ location.hash = ''; location.reload(); });
+}
+/* hashchange 也要接：使用者最自然的動作是「在網址列最後面加上 #selftest 再按 Enter」，
+   而只改 hash 的話瀏覽器**不會重新載入頁面**——沒有這一行，他按了 Enter 什麼事都不會發生，
+   而那正是他這幾輪一直遇到的「開了但跑不出來」。 */
+window.addEventListener('hashchange', ()=>{
+  if(location.hash === '#selftest' && !document.getElementById('selftestBox')){
+    try{ runSelfTest(); }catch(e){ console.error(e); }
+  }
+});
+if(location.hash === '#selftest'){
+  /* 等開機跑完再測，否則預設清單還沒建好 */
+  setTimeout(()=>{ try{ runSelfTest(); }catch(e){
+    const d=document.createElement('pre');
+    d.style.cssText='position:fixed;inset:0;z-index:99999;background:#080b12;color:#fb7185;padding:16px;font-size:14px;white-space:pre-wrap';
+    d.textContent='自我測試本身壞掉了：\n'+(e&&e.stack||e);
+    document.body.appendChild(d);
+  } }, 1200);
+}
+
 /* ══ 測試用的存取點 ══
    tests/regression-tests.html 會把這個檔案載進 iframe，直接呼叫裡面**真正的函式**
    （刻意不複製一份邏輯過去——複製的那一份總有一天會過期，然後對著一份
