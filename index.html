@@ -211,6 +211,16 @@
      只有「抓取顯示中的」「抓取全部 100 檔」還是 13px——而字級是這一頁唯一有效的放大開關。 */
   html[data-fs="mid"] .act-row > .btn{ font-size:14px; }
   html[data-fs="big"] .act-row > .btn{ font-size:16px; }
+  /* v93：上面那段 v91 的註解寫「全頁其他按鈕都變 16px」——那句話當時沒有量過，而且是錯的。
+     真正會放大的只有表格列裡的按鈕（靠 #wlBody td:last-child button 那幾條），
+     .btn 這個基底一直是寫死的 15px。實測小→大：
+       「印一份給人看」15→15、「帶我去記一筆」15→15、「設定」15→15、
+       「去輸入 FinMind Token」15→15、「清除篩選」15→15。
+     使用者的標準把「按鈕」列為不論哪個字級都不能太小的那一類，
+     而大字模式存在的理由就是給老花使用者按得到、看得懂。這裡補上縮放。
+     .act-row > .btn（百大那一列的密集動作）權重比這條高，維持它自己的 14/16。 */
+  html[data-fs="mid"] .btn{ font-size:16px; }
+  html[data-fs="big"] .btn{ font-size:18px; }
   /* v90：把頁面放大到等效 280px 寬（手機開 150%、或小尺寸裝置）時，
      首屏那幾行長數字會把容器撐破 24px——實測「準確金額是 7,632,570 元」
      與「手上這些花了 15,508,578 元．現在值 20,739,750 元」。
@@ -223,7 +233,17 @@
   }
   @media (max-width: 820px){
     /* 手機是卡片式版面，沒有「欄」可以對齊，維持整行寬度比較好讀 */
-    .pe-note{ max-width:none; margin-left:0; }
+    /* v93：這一行原本只解掉 max-width 與 margin-left，忘了 min-width。
+       桌機版的 min-width:180px（大字模式 150px）在 320px 螢幕上會把這個
+       說明框撐得比卡片還寬——實測「這個倍數是用 08/14 的收盤價 …」整段
+       往右溢出 35px，被 body 裁掉，使用者看不到句尾。
+       而且一般字級溢得比大字模式更多（35px vs 5px），因為 min-width 剛好相反。
+       這是「覆寫時只改了看得到的那幾個屬性」的典型漏網。 */
+    /* mid/big 另外有一條 html[data-fs="…"] .pe-note{min-width:150px}，權重比上面那條高，
+       所以要同名覆寫一次——不然大字模式在 320px 還是會溢出 5px。 */
+    .pe-note,
+    html[data-fs="mid"] .pe-note,
+    html[data-fs="big"] .pe-note{ max-width:none; min-width:0; margin-left:0; }
   }
 
   .btn-row{ font-size:13.5px; padding:0 11px; border-radius:10px; }
@@ -381,10 +401,12 @@
   @media (max-width:768px){
     html[data-fs="mid"] #wlBody td:nth-child(2) .text-\[10px\]{ font-size:13px !important; }
     html[data-fs="big"] #wlBody td:nth-child(2) .text-\[10px\]{ font-size:15px !important; }
+    /* v93：這一格是「⛔ 資料 110 天前 / 真實 08-14」——價格可不可信的唯一標示。
+       一般模式原本 9.5px，抬到 12px 之後這裡也要跟著往上，不然 sm 與 mid 一樣大。 */
     html[data-fs="mid"] #wlBody td:nth-child(3) .tag,
-    html[data-fs="mid"] #t100Body td:nth-child(3) .tag{ font-size:12px; }
+    html[data-fs="mid"] #t100Body td:nth-child(3) .tag{ font-size:13px; }
     html[data-fs="big"] #wlBody td:nth-child(3) .tag,
-    html[data-fs="big"] #t100Body td:nth-child(3) .tag{ font-size:14px; }
+    html[data-fs="big"] #t100Body td:nth-child(3) .tag{ font-size:15px; }
     html[data-fs="mid"] #wlBody td:nth-child(9) > div:not(.tag){ font-size:12px !important; }
     html[data-fs="big"] #wlBody td:nth-child(9) > div:not(.tag){ font-size:14px !important; }
     html[data-fs="mid"] #wlBody td:last-child button,
@@ -594,6 +616,11 @@
      .ds-name（資料出處）與 .pnl-pct（損益百分比）同樣沒有跟著放大。 */
   html[data-fs="mid"] .af-lab, html[data-fs="mid"] .af-tip{ font-size:13px; height:auto; line-height:1.35; }
   html[data-fs="big"] .af-lab, html[data-fs="big"] .af-tip{ font-size:15px; height:auto; line-height:1.35; }
+  /* v92c（使用者的標準）：「任何會改變『我是否相信這個數字』的資訊」不該被縮到看不清。
+     實測預設（大）字級下這些全部已經是 15px，並沒有 9–10px 的可信度資訊；
+     但使用者若自己把字級調到「小」，來源標籤會掉到 10px。
+     主要數字縮小是他自己的選擇，證據縮小不是——所以這一類給一個不隨字級往下掉的下限。 */
+  .ds-name{ font-size:13px; }
   html[data-fs="mid"] .ds-name{ font-size:13px; }
   html[data-fs="big"] .ds-name{ font-size:15px; }
   html[data-fs="mid"] .pnl-pct{ font-size:15px !important; }
@@ -759,13 +786,39 @@
       border-radius:9px; padding:6px 9px !important; margin-top:7px;
       font-size:14px; font-weight:700; letter-spacing:-.01em;
     }
+    /* v93：這四個方塊是展開後的「賺賠 %／千張大戶／負債比／本益比」，寫死 14px，
+       小→大完全不變（實測 +70.00% 14→14、42.0% 14→14）。
+       賺賠與本益比都在使用者列的「不能太小」名單裡，補上縮放。 */
+    html[data-fs="mid"] #wlBody td:nth-child(4), html[data-fs="mid"] #wlBody td:nth-child(5),
+    html[data-fs="mid"] #wlBody td:nth-child(6), html[data-fs="mid"] #wlBody td:nth-child(7),
+    html[data-fs="mid"] #t100Body td:nth-child(4), html[data-fs="mid"] #t100Body td:nth-child(5),
+    html[data-fs="mid"] #t100Body td:nth-child(6){ font-size:16px; }
+    html[data-fs="big"] #wlBody td:nth-child(4), html[data-fs="big"] #wlBody td:nth-child(5),
+    html[data-fs="big"] #wlBody td:nth-child(6), html[data-fs="big"] #wlBody td:nth-child(7),
+    html[data-fs="big"] #t100Body td:nth-child(4), html[data-fs="big"] #t100Body td:nth-child(5),
+    html[data-fs="big"] #t100Body td:nth-child(6){ font-size:18px; }
     /* 標題 */
     #wlBody td:nth-child(2) .font-bold, #t100Body td:nth-child(1) .font-bold{ font-size:16px; line-height:1.2; }
     #wlBody td:nth-child(2) .text-\[10px\]{ font-size:10.5px !important; line-height:1.35; margin-top:2px; }
     #wlBody td:nth-child(3) .tabular-nums, #t100Body td:nth-child(3) .tabular-nums{
       font-size:21px; font-weight:800; letter-spacing:-.02em; line-height:1.1;
     }
-    #wlBody td:nth-child(3) .tag, #t100Body td:nth-child(3) .tag{ margin-top:3px; font-size:9.5px; padding:2px 5px !important; }
+    /* v93：這一格是「這個價格可不可信」的唯一標示——「真實 08-14」還是「⛔ 資料 110 天前」。
+       原本 9.5px。使用者的標準是：不論字級調到哪一級，「資料是否過期」都不能太小。
+       9.5px 連正常視力都要瞇眼，而它旁邊就是要拿來做賣出決定的價格。抬到 11px。 */
+    #wlBody td:nth-child(3) .tag, #t100Body td:nth-child(3) .tag{ margin-top:3px; font-size:12px; padding:2px 5px !important; }
+
+    /* v93：股價完全沒有參與字級縮放——實測 sm/mid/big 三個模式都是同一個數字
+       （收合 14px、展開 21px），而同一張卡片上的股名 11→13→15、按鈕 12.5→14→16 都有放大。
+       結果是大字模式下「股價」比「股票名稱」還小，比按鈕還小。
+       這跟 v92 的 .af-lab / .ds-name / .pnl-pct 是同一個缺陷：寫死的 px 沒有進縮放表。
+       收合時股價本來就是次要（英雄數字是賺賠），所以放大幅度給得比展開時保守。 */
+    html[data-fs="mid"] #wlBody tr:not([data-open]) td:nth-child(3) .tabular-nums{ font-size:16px !important; }
+    html[data-fs="big"] #wlBody tr:not([data-open]) td:nth-child(3) .tabular-nums{ font-size:18px !important; }
+    html[data-fs="mid"] #wlBody td:nth-child(3) .tabular-nums,
+    html[data-fs="mid"] #t100Body td:nth-child(3) .tabular-nums{ font-size:23px; }
+    html[data-fs="big"] #wlBody td:nth-child(3) .tabular-nums,
+    html[data-fs="big"] #t100Body td:nth-child(3) .tabular-nums{ font-size:25px; }
 
     /* 位階橫幅 */
     #wlBody td:nth-child(9) .tag, #t100Body td:nth-child(8) .tag{
@@ -925,7 +978,7 @@
            起因是很實際的一件事：改好的東西部署上去之前，畫面上完全看不出手上這份是哪一版，
            使用者以為沒改、我以為改了，兩邊各講各的。這一行由 build.sh 在建置時填入，
            不可能寫錯，也不會忘了更新。 -->
-      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v92 · 2026-08-19 21:34</span>
+      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v92 · 2026-08-19 23:56</span>
     </div>
 
     <!-- 設定：預設收合。裡面是 Token、登出、診斷、隱私、說明、示範資料、資料儲存、進階設定。 -->
@@ -2338,6 +2391,21 @@ function ageTag(d, base, tone){
   if(typeof v === 'number' && v > 10)
     return `<span class="tag border bg-orange-500/15 text-orange-300 border-orange-500/40" title="這檔的最後一筆日線是 ${esc(d.asOf)}，距今 ${v} 天。可能已停止交易、合併下市或暫停買賣，請向券商確認。">停更 ${esc(d.asOf)}</span>`;
   return null;
+}
+/* 本益比是「官方公布的」還是「本頁自己算的」——這是可信度資訊，不是裝飾。
+   v92c：以前兩處各寫一份，而且「自算」用的是淡灰（text-slate-500），
+   視覺上等於在說「這個比較不重要」；實際上剛好相反：自算才是需要留意的那一個
+   （證交所沒公布，本頁用 股價 ÷ 自算 EPS 推出來的）。
+   兩份手抄副本收斂成這一支，順便把強調方向調正。 */
+function peSrcBadge(d){
+  if(!d) return '';
+  if(d.peSrc === 'official')
+    return `<div class="text-[10px] text-emerald-400/80 font-normal" title="證交所每日公布的官方本益比">官方${
+      d.perAsOf ? ' ' + esc(String(d.perAsOf).slice(5)) : ''}</div>`;
+  if(d.peSrc === 'calc')
+    return '<div class="text-[10px] text-amber-300/90 font-normal"'
+         + ' title="證交所沒有公布這一檔的本益比，這個數字是本頁用 股價 ÷ 自算 EPS 算出來的">⚠ 自算</div>';
+  return '';
 }
 function srcBadge(d){
   if(!d) return '';
@@ -4099,8 +4167,13 @@ function epsFromRows(byDate, opts){
   /* 沒有官方 PER 可以對照時：不猜。兩種解讀差很多就把兩個都講出來，
      並採用**比較保守**的那一個（EPS 較小 → 本益比較高 → 不會誤判成便宜）。 */
   const conservative = Math.min(bySum, byYtd);
+  /* v92c（使用者指出的）：這一支說「不猜」，但它其實還是選了一個答案（取小的那個）。
+     那個選擇在風險控制上是對的，但畫面上不能讓它看起來像「已確認的事實」。
+     ambiguous 旗標會一路帶到畫面，讓 EPS 那個數字自己帶著「口徑未確認」，
+     而不是只在下面一行小字裡交代。 */
   return { eps:conservative, quarters:last4, vals,
     qVals: conservative===byYtd ? qFromYtd() : vals, cumulative: conservative===byYtd,
+    ambiguous: true, alt: { bySum, byYtd, taken: conservative },
     how: conservative===byYtd?'累計制換算（保守取小）':'四季相加（保守取小）',
     note:`這檔的 EPS 有兩種可能：四季相加 ${bySum} 元、累計制換算 ${byYtd} 元，而目前沒有官方本益比可以對照。已採用比較保守的 ${conservative} 元（本益比會偏高，不會誤判成便宜）。請與官方財報核對。` };
 }
@@ -4441,6 +4514,8 @@ async function fetchStockLive(s){
         out.epsQuarters = r.quarters;
         out.epsVals = epsValsOf(r);
         out.epsCumulative = !!r.cumulative;
+        out.epsAmbiguous = !!r.ambiguous;
+        out.epsAlt = r.alt || null;
         out.epsHow = r.how;
         if(r.note) out.epsNote = r.note;
         logField('財報 (FinancialStatements)', 'TTM EPS 算法', r.how + '　→ ' + r.eps + ' 元');
@@ -4705,6 +4780,7 @@ function reapply(s, src){
   applyStockData(s, {
     price:d.price, eps:d.eps, debt:d.debt, holder:d.holder, holderPrev:d.holderPrev,
     series:d.series, asOf:d.asOf, epsNote:d.epsNote, holderNote:d.holderNote,
+    epsAmbiguous:d.epsAmbiguous, epsAlt:d.epsAlt,
     epsQuarters:d.epsQuarters, epsVals:d.epsVals, err:d.err,
     per:d.per, pbr:d.pbr, divYield:d.divYield, perHist:d.perHist, pbrHist:d.pbrHist, perAsOf:d.perAsOf,
     perRows:d.perRows, corpEvents:d.corpEvents, __reapply:true
@@ -4756,6 +4832,8 @@ function applyStockData(s, d, src){
     fill: fillStats(d.series || [], d.corpEvents),
     divPS: divPerShare(d.corpEvents),
     epsNote: d.epsNote || null,
+    epsAmbiguous: !!d.epsAmbiguous,
+    epsAlt: d.epsAlt || null,
     holderNote: d.holderNote || null,
     epsQuarters: d.epsQuarters || null,
     epsVals: d.epsVals || null,
@@ -5259,8 +5337,7 @@ function renderT100(){
         <div class="mt-0.5">${srcBadge(d)}</div>
       </td>
       <td class="px-2.5 py-2 text-right tabular-nums text-slate-300 m-lab" data-label="本益比">${d.pe==null?'—':fmt(d.pe,1)}
-        ${d.peSrc==='official' ? `<div class="text-[10px] text-emerald-400/80 font-normal">官方${d.perAsOf?' '+esc(String(d.perAsOf).slice(5)):''}</div>`
-          : (d.peSrc==='calc' ? '<div class="text-[10px] text-slate-500 font-normal">自算</div>' : '')}
+        ${peSrcBadge(d)}
         ${(()=>{ const ph = pctPhrase(pctSelf, (d.perHist||[]).length); return ph
             ? `<div class="tag border ${ph.cls} mt-0.5 text-[11px]">${ph.t}</div>` : ''; })()}</td>
       <td class="px-2.5 py-2 text-right tabular-nums ${debtCls} m-lab" data-label="負債比">${d.debt==null?'—':(d.debt*100).toFixed(1)+'%'}</td>
@@ -6128,7 +6205,13 @@ function targetPanelHTML(s){
         ${d.rtStale ? `<div class="rounded-lg border border-cyan-500/40 bg-cyan-500/10 text-cyan-200 p-2 mb-2 text-[11px] leading-relaxed">
           ⚡ <strong>價格為即時報價，但下方的均線與布林通道仍以前一交易日收盤計算</strong>，未含今日盤中波動。
           盤中劇烈波動時，短期通道的寬度會被低估（實測漲停時可低估約 44%），請以長期估值為主要判斷依據。</div>` : ''}
-      <div class="text-[11px] text-slate-400 flex items-center gap-2 flex-wrap">🏛️ 長期目標價 · 本益比估值法（近 4 季累積 EPS ${d.eps?fmt(d.eps,2):'—'} 元）${srcBadge(d)}</div>
+      <div class="text-[11px] text-slate-400 flex items-center gap-2 flex-wrap">🏛️ 長期目標價 · 本益比估值法（近 4 季累積 EPS ${d.eps?fmt(d.eps,2):'—'} 元${
+        d.epsAmbiguous ? '<span class="tag border border-amber-500/50 bg-amber-500/15 text-amber-200 ml-1">⚠ 口徑未確認</span>' : ''}）${srcBadge(d)}</div>
+        ${d.epsAmbiguous && d.epsAlt ? `<div class="mt-1 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-[12px] text-amber-100 leading-relaxed">
+          官方沒有公布這一檔的本益比，所以無法確認財報給的是<strong>單季</strong>還是<strong>累計</strong>。兩種讀法都算得出一個答案：<br>
+          <span class="tabular-nums">・四季相加：<strong>${fmt(d.epsAlt.bySum,2)}</strong> 元　・累計制換算：<strong>${fmt(d.epsAlt.byYtd,2)}</strong> 元</span><br>
+          <strong>本頁目前採用比較保守的 ${fmt(d.epsAlt.taken,2)} 元</strong>（EPS 取小 → 本益比偏高 → 不會誤判成便宜）。
+          這是本頁替你做的選擇，<strong>不是已經確認的事實</strong>；要確定請對照官方財報。</div>` : ''}
         ${d.epsQuarters && d.epsQuarters.length ? `<div class="text-[10px] text-slate-500 mt-0.5">財報期別：${esc(d.epsQuarters[0])} ～ ${esc(d.epsQuarters[d.epsQuarters.length-1])}（共 ${d.epsQuarters.length} 季）</div>` : ''}
         ${d.epsNote ? `<div class="text-[10px] text-amber-400/90 mt-1 leading-relaxed">⚠ ${safeText(d.epsNote,200)}</div>` : ''}
       </div>
@@ -6740,9 +6823,7 @@ function renderTable(){
       <td class="px-2.5 py-2 text-right tabular-nums ${hCls} m-lab" data-label="千張大戶">${d.holder==null?'—':pct(d.holder)}</td>
       <td class="px-2.5 py-2 text-right tabular-nums ${debtCls} m-lab" data-label="負債比">${d.debt==null?'—':(d.debt*100).toFixed(1)+'%'}</td>
       <td class="px-2.5 py-2 text-right tabular-nums text-slate-300 m-lab" data-label="本益比">${d.pe==null?'—':fmt(d.pe,1)}
-        ${d.peSrc==='official'
-            ? `<div class="text-[10px] text-emerald-400/80 font-normal">官方${d.perAsOf?' '+esc(String(d.perAsOf).slice(5)):''}</div>`
-            : (d.peSrc==='calc' ? '<div class="text-[10px] text-slate-500 font-normal">自算</div>' : '')}
+        ${peSrcBadge(d)}
         <div class="pe-note cell-note text-[12px] text-slate-400 font-normal leading-snug mt-0.5 text-left">${peBaseRate(d, vTrue, real)}</div></td>
       <td class="px-2.5 py-2 m-lab" data-label="動物狀態">
         <div class="flex flex-wrap gap-1">${animals.map(k=>animalTag(k, s.ind)).join('') || '<span class="text-slate-400 text-[12px]">—</span>'}</div>
@@ -8161,6 +8242,7 @@ function cacheOf(x){
   return {
     price:d.price, eps:d.eps, debt:d.debt, holder:d.holder, holderPrev:d.holderPrev,
     asOf:d.asOf, epsNote:d.epsNote, holderNote:d.holderNote,
+    epsAmbiguous:d.epsAmbiguous, epsAlt:d.epsAlt,
     epsQuarters:d.epsQuarters, epsVals:d.epsVals,
     per:d.per, pbr:d.pbr, divYield:d.divYield, perAsOf:d.perAsOf,
     perHist:cut(d.perHist), pbrHist:cut(d.pbrHist),
@@ -8208,6 +8290,10 @@ function sanitizeCache(c){
     fcfNote: typeof c.fcfNote==='string' ? c.fcfNote.slice(0,300) : null,
     asOf:(typeof c.asOf==='string' && /^\d{4}-\d{2}-\d{2}$/.test(c.asOf)) ? c.asOf : null,
     epsNote: c.epsNote ? String(c.epsNote).slice(0,200) : null,
+    epsAmbiguous: !!c.epsAmbiguous,
+    epsAlt: (c.epsAlt && typeof c.epsAlt === 'object' && !Array.isArray(c.epsAlt))
+      ? { bySum:num(c.epsAlt.bySum,-1e4,1e4), byYtd:num(c.epsAlt.byYtd,-1e4,1e4), taken:num(c.epsAlt.taken,-1e4,1e4) }
+      : null,
     holderNote: c.holderNote ? String(c.holderNote).slice(0,200) : null,
     epsQuarters: Array.isArray(c.epsQuarters) ? c.epsQuarters.slice(0,8).map(v=>String(v).slice(0,20)) : null,
     epsVals: arr(c.epsVals,-1e4,1e4),
@@ -10104,6 +10190,20 @@ bootAutoConnect()
    安全性：一進來就把自動儲存關掉，全程不寫入 localStorage，
    所以你的成本價與交易紀錄不會被動到。看完關掉分頁或重新整理即可。
    ══════════════════════════════════════════════════════════════ */
+/* 把備份完整放回 state.watchlist。抽成具名函式有兩個理由：
+   ① finally 裡那段邏輯本身要能被測試呼叫（見 TC-015），不然它就是一段沒人驗過的還原程式；
+   ② 「怎麼還原」只有一份實作。 */
+function restoreWatchlist(backup){
+  const cur = new Map(state.watchlist.map(x => [x.id, x]));
+  state.watchlist.length = 0;
+  backup.forEach(w => {
+    const o = cur.get(w.id) || {};
+    Object.keys(o).forEach(k => { if(!(k in w)) delete o[k]; });
+    Object.assign(o, JSON.parse(JSON.stringify(w)));
+    state.watchlist.push(o);
+  });
+}
+
 function runSelfTest(){
   /* 第一件事就是關掉自動儲存——有兩處測試一定要走全域狀態（真的表單、存檔往返），
      那期間絕不能寫進他的存檔。 */
@@ -10603,6 +10703,36 @@ T('TC-013', '不是今天的成交不可以標成「即時」', () => {
 
 /* ══════════ 面額 ══════════ */
 
+T('TC-015', '自我測試的還原必須是完整交易（不能只補回還活著的元素）', () => {
+  /* 這一條測的是 finally 裡真正用的那一支 restoreWatchlist()。
+     模擬 applySnapshot() 做的事：**整個陣列被換掉**，非 top100 又沒加入自選的項目
+     （例如用「查一檔」看過、還留在記憶體裡的那一檔）就此消失。
+     舊寫法是「照 id 把還活著的元素補回去」，補不回已經不在陣列裡的東西——
+     實測 101 筆變 100 筆，那一筆 9999 不見了。 */
+  const backup = JSON.parse(JSON.stringify(state.watchlist));
+  const probe = { id: '__probe__', name: '查一檔看過的', type: 'lookup',
+                  inWatch: false, txns: [], txnHide: [] };
+  state.watchlist.push(probe);
+  const snapshotOfAll = JSON.parse(JSON.stringify(state.watchlist));
+  /* applySnapshot 那一行的等效動作 */
+  state.watchlist = state.watchlist.filter(x => x.type === 'top100');
+  const afterFilter = state.watchlist.length;
+  restoreWatchlist(snapshotOfAll);
+  const ok = state.watchlist.length === snapshotOfAll.length
+          && !!state.watchlist.find(x => x.id === '__probe__')
+          && state.watchlist.map(x => x.id).join(',') === snapshotOfAll.map(x => x.id).join(',');
+  restoreWatchlist(backup);          // 把探針清掉，別留在正式清單裡
+  return {
+    input: `${snapshotOfAll.length} 筆（含一筆 type:'lookup' 的 __probe__）→ 模擬 applySnapshot 換掉整個陣列（只剩 ${afterFilter} 筆）`,
+    call: 'restoreWatchlist()',
+    expect: `完整還原成 ${snapshotOfAll.length} 筆，順序一樣，__probe__ 也要回來`,
+    actual: `${state.watchlist.length + 0} 筆（還原後再清掉探針前的比對結果：${ok ? '一致' : '不一致'}）`,
+    ok,
+    why: '「補回還活著的元素」不是 rollback。要保證「測試前的 state → 任意破壞性測試 → finally → 等價的 state」，'
+       + '就得按備份完整重建陣列內容（同時保留陣列本身與可對應物件的 identity）。'
+  };
+});
+
 T('TC-014', '拿不到官方股價淨值比時，不可以假設面額 10 元', () => {
   const s = fresh([], { capStock: 1e9, pbr: null, equity: null });
   const r = sharesOutstanding(s.data);
@@ -10637,6 +10767,7 @@ T('TC-014', '拿不到官方股價淨值比時，不可以假設面額 10 元', 
        I6  現金守恆：付出去的錢 − 收到的錢 ＝ 剩餘成本 − 已實現損益 − 現金股利
            （這條式子裡沒有平均成本、沒有攤提，跟被測邏輯完全無關）
        I7  同一天、同一件事的公司行為只能算一次
+       I8  跟一份**完全獨立、刻意寫得很笨**的參考帳本算出同一個答案
 
      I6 是這一組裡最有力的一條：它用「錢的進出」直接對帳，
      任何攤提、比例、順序的錯都會讓等號不成立。
@@ -10769,8 +10900,13 @@ T('TC-014', '拿不到官方股價淨值比時，不可以假設面額 10 元', 
         if (!same(b1, four(positionOf(S())))) bad.push('I5 存檔往返後數字變了');
       } catch (e) { bad.push('I5 丟出例外：' + (e && e.message)); }
 
-      /* I6：現金守恆。用帳本標回來的實際金額（_usedShares／_cash），
-         不重算任何攤提，所以這條跟被測邏輯是獨立的。 */
+      /* I6：現金守恆。
+         v92c（使用者指出的）：這裡原本寫「跟被測邏輯是獨立的」，那句話比實際保證強。
+         買賣金額走 _usedShares、配息與減資金額走 _cash，而**這兩個欄位都是
+         positionOf() 自己寫上去的**。如果它把應領股利 10,000 算成 8,000，
+         _cash 也會是 8,000，這條等式照樣成立——某些錯誤有辦法自己證明自己對。
+         準確的說法是：**這條驗的是帳本內部的現金流恆等式，其中部分金額取自
+         被測程式自己記錄的執行結果**。真正的 oracle 是下面 I8。 */
       try {
         const s2 = load(txns, corp); const p2 = positionOf(s2);
         let out = 0, inn = 0, skip = false;
@@ -10793,6 +10929,63 @@ T('TC-014', '拿不到官方股價淨值比時，不可以假設面額 10 元', 
             bad.push(`I6 現金不守恆：付出−收到 ${lhs.toFixed(2)}　vs　剩餘成本−已實現−股利 ${rhs.toFixed(2)}`);
         }
       } catch (e) { bad.push('I6 丟出例外：' + (e && e.message)); }
+
+      /* I8：獨立參考帳本（oracle）。
+         這一段刻意用最笨的方式把同一本帳再算一次：不看 _cash、不看 _usedShares、
+         不用 positionOf 的任何中間結果，只照「平均成本法」的定義硬算。
+         它是一份**刻意的重複實作**——一般情況下重複實作正是這個專案在拔的東西，
+         但測試的 oracle 剛好相反：兩份互相獨立的實作算出同一個答案，才是真的證據。
+         只驗「乾淨」的帳本（沒有警告、沒有自動事件、沒有日期不詳），
+         因為那幾種情況牽涉到本頁自己的政策選擇，不是純算術。
+
+         ══ 它到底有沒有用？（2026-08-19 實測）══
+         覆蓋率：200 本裡有 35 本符合「乾淨」條件而真的被驗到，
+                 這 35 本裡買 62 筆、賣 25 筆、配息 21 筆、配股 23 筆、減資 15 筆——
+                 五種都走到了，不是掛在那裡好看的。
+         鑑別力：把配息故意少算 10%，而且**讓 _cash 跟著一起錯**
+                 （也就是使用者說的「錯誤自己證明自己是對的」那種），
+                 實測 I6 完全不會響，只有 I8 抓到：股利 1340.99 vs 參考帳本 1206.89。
+                 這正是 I8 存在的理由。 */
+      try{
+        const s3 = load(txns, []);            // 不給官方事件，避免混入自動推導
+        const p3 = positionOf(s3);
+        const plain = p3.problems.length === 0
+          && p3.txns.every(t => !t.auto && !t.dateUnknown && t.date);
+        if(plain){
+          let sh = 0, cost = 0, real = 0, div = 0, okRef = true;
+          for(const t of p3.txns){
+            const n = Math.max(0, +t.shares || 0), pr = +t.price || 0;
+            if(t.kind === 'buy'){
+              if(!(n > 0 && pr > 0)){ okRef = false; break; }
+              const amt = n * pr; sh += n; cost += amt + txnFee(amt);
+            }else if(t.kind === 'sell'){
+              if(!(n > 0 && pr > 0) || n > sh + 1e-9){ okRef = false; break; }
+              const amt = n * pr, avg = sh > 0 ? cost / sh : 0;
+              real += amt - txnFee(amt) - Math.round(amt * txnTaxRate(s3.id)) - avg * n;
+              cost -= avg * n; sh -= n;
+            }else if(t.kind === 'div'){
+              if(sh > 0 && pr > 0) div += sh * pr;
+            }else if(t.kind === 'stkdiv'){
+              if(!(t.ratio > 1)){ okRef = false; break; }
+              sh += sh * (t.ratio - 1);
+            }else if(t.kind === 'reduce'){
+              if(!(t.ratio > 0 && t.ratio < 1)){ okRef = false; break; }
+              const before = sh, back = pr > 0 ? before * pr : 0;
+              if(back > 0){ if(back <= cost) cost -= back; else { real += back - cost; cost = 0; } }
+              sh = before * t.ratio;
+            }else { okRef = false; break; }
+          }
+          if(okRef){
+            if(Math.abs(sh - p3.shares) > 1e-6 || Math.abs(cost - p3.cost) > 1
+               || Math.abs(real - p3.realized) > 1 || Math.abs(div - p3.divCash) > 1)
+              bad.push(`I8 跟獨立參考帳本對不上：股數 ${sh.toFixed(3)}/${p3.shares.toFixed(3)}`
+                     + `　成本 ${cost.toFixed(2)}/${p3.cost.toFixed(2)}`
+                     + `　已實現 ${real.toFixed(2)}/${p3.realized.toFixed(2)}`
+                     + `　股利 ${div.toFixed(2)}/${p3.divCash.toFixed(2)}`);
+          }
+        }
+      }catch(e){ bad.push('I8 丟出例外：' + (e && e.message)); }
+
 
       /* I7：同一天、同一件事只能算一次（自己補的 ＋ 官方的） */
       if (corp.length) {
@@ -10843,11 +11036,13 @@ T('TC-014', '拿不到官方股價淨值比時，不可以假設面額 10 元', 
   out.push({ id:'INV', name:`不變量檢查：${ROUNDS} 本亂數帳本（買、部分賣、全賣、再買、配股、配息、減資、同日事件、日期不詳、官方與自己補的公司行為相撞）`,
              input:`亂數生成 ${ROUNDS} 本帳本（固定種子，同一份檔案每次結果一樣）`,
              call:'positionOf() / allTxns() / snapshot() / applySnapshot()',
-             expect:'I1 不丟例外　I2 沒有 NaN　I3 股數與成本不為負　I4 沒有警告的帳本順序無關　I5 存檔往返不變　I6 現金守恆　I7 公司行為不重複計算',
+             expect:'I1 不丟例外　I2 沒有 NaN　I3 股數與成本不為負　I4 沒有警告的帳本順序無關　I5 存檔往返不變　I6 現金守恆　I7 公司行為不重複計算　I8 與獨立參考帳本一致',
              actual: (invBad.length ? invBad.slice(0,6).join('　／　') : `${ROUNDS} 本全部通過`) + `（種子 ${SEED}）`,
              ok: invBad.length === 0,
-             why:'I6 是最有力的一條：用錢的進出直接對帳（付出去的錢 − 收到的錢 ＝ 剩餘成本 − 已實現損益 − 現金股利），'
-               + '式子裡沒有平均成本也沒有攤提，任何攤提、比例或順序的錯都會讓等號不成立。',
+             why:'I6 驗的是帳本內部的現金流恆等式（付出去的錢 − 收到的錢 ＝ 剩餘成本 − 已實現損益 − 現金股利），'
+               + '但其中部分金額取自被測程式自己記錄的執行結果，所以它抓不到「連記錄一起錯」的情況。'
+               + 'I8 才是獨立的交叉驗證：用一份完全不共用那些欄位、刻意寫得很笨的參考帳本把同一本帳再算一次。'
+               + '實測把配息連同記錄一起少算 10%，I6 不響、只有 I8 抓到。',
              status: invBad.length ? 'FAIL' : 'PASS' });
 
   const pass = out.filter(x=>x.status==='PASS').length;
@@ -10948,8 +11143,20 @@ T('TC-014', '拿不到官方股價淨值比時，不可以假設面額 10 元', 
        用 id 對回原本那一份物件，不換掉 watchlist 這個陣列本身——
        畫面上有地方持有那個陣列的參照，整個換掉會讓它們指到舊的。 */
     try{
-      const by = {}; _watch0.forEach(w => { by[w.id] = w; });
-      state.watchlist.forEach(x => { const w = by[x.id]; if(w) Object.assign(x, w); });
+      /* v92d（使用者指出、實測證實）：舊寫法是「照 id 把還活著的元素補回去」，
+         那只還原得了「測試結束後仍然存在於新陣列裡」的元素。
+         但 I5 會真的呼叫 applySnapshot()，而它內部是
+             state.watchlist = state.watchlist.filter(x => x.type === 'top100')
+         ——**整個陣列被換掉**，非 top100 而且沒有加入自選的項目（例如用「查一檔」
+         看過、還留在記憶體裡的那一檔）在那一刻就消失了，補不回來。
+         實測：測試前 101 筆（含一筆 type:'lookup' 的 9999），測試後 100 筆，9999 不見。
+
+         改成完整重建：清空陣列內容再按照備份逐一放回去。
+           ・陣列本身不換（畫面上有地方持有這個參照）
+           ・id 對得上的沿用原本那個物件（進行中的抓取靠 includes(s) 判斷有效性）
+           ・沿用時先刪掉測試期間新增的欄位，再整份覆蓋，避免殘留
+         這樣才是「測試前的 state → 任意破壞性測試 → finally → 等價的 state」。 */
+      restoreWatchlist(_watch0);
       state.autoSave = _autoSave0; state.privacy = _priv0;
       state.selected = _sel0; state.txnStock = _txn0;
       state._selftest = false;
@@ -10994,7 +11201,12 @@ if(location.hash === '#selftest'){
    （刻意不複製一份邏輯過去——複製的那一份總有一天會過期，然後對著一份
    跟線上不一樣的程式說「全部通過」）。
    函式宣告本來就掛在 window 上，拿得到；但 `state` 與 `TXN_ORDER` 是 const，
-   const 不會變成 window 的屬性，所以這裡明確開一個唯讀的存取點。
+   const 不會變成 window 的屬性，所以這裡開一個固定的存取點。
+   v92c（使用者指出的）：原本這裡寫「唯讀」，那句話比實際保證強。
+   Object.freeze 凍住的只有 __app 這一層——__app.state 這個 getter 換不掉，
+   但 __app.state.watchlist[0].txns = [] 仍然改得動。
+   而那正是測試需要的能力，所以不為了 freeze 而 freeze，只把契約講準：
+   這是一個**固定、不能被替換的測試入口**；它回傳的正式 state 本身**仍然可變**。
    安全性上沒有多開任何門：CSP 只允許本檔案自己的 inline script，
    跑得到這裡的程式本來就已經在同一個作用域裡。 */
 window.__app = Object.freeze({
