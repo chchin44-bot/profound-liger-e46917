@@ -925,7 +925,7 @@
            起因是很實際的一件事：改好的東西部署上去之前，畫面上完全看不出手上這份是哪一版，
            使用者以為沒改、我以為改了，兩邊各講各的。這一行由 build.sh 在建置時填入，
            不可能寫錯，也不會忘了更新。 -->
-      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v92 · 2026-08-19 17:02</span>
+      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v92 · 2026-08-19 17:34</span>
     </div>
 
     <!-- 設定：預設收合。裡面是 Token、登出、診斷、隱私、說明、示範資料、資料儲存、進階設定。 -->
@@ -935,6 +935,10 @@
         <button id="dataBtn2"  class="btn btn-ghost">資料儲存</button>
         <button id="privBtn"   class="btn btn-ghost" title="隱藏成本、損益與市值金額">隱私模式</button>
         <button id="diagBtn"   class="btn btn-ghost" title="檢查連線狀態、實際請求網址與資料欄位偵測">連線診斷</button>
+        <!-- v92b：本來只能靠在網址後面打 #selftest。實測使用者連續三輪都卡在「網址」這件事上
+             （網域打錯、開成 github.com、檔案上傳成空的、瀏覽器拿到快取的舊檔）。
+             一顆按得到的按鈕沒有這些失敗模式。網址那條路留著，不衝突。 -->
+        <button id="selftestBtn" class="btn btn-ghost" title="用這個檔案裡真正的函式跑一次算術與資料驗證（不會動到你的資料）">自我測試</button>
         <button id="logoutBtn" class="btn btn-danger" title="清除這台裝置上的 Token 與持倉，交還裝置前請務必執行">登出／清除</button>
       </div>
 
@@ -8169,6 +8173,9 @@ function cacheOf(x){
 }
 
 /* 備份檔可以由使用者匯入，因此快取欄位一律當成不可信輸入處理 */
+/* 這一輪還原／匯入中，有幾筆公司行為因為看不懂而被丟掉。
+   由 applySnapshot 在開頭歸零、結束時抄進 state，讓上層講得出來。 */
+let _corpDropped = 0;
 function sanitizeCache(c){
   if(!c || typeof c !== 'object' || Array.isArray(c)) return null;
   const num = (v, lo, hi) => (typeof v === 'number' && isFinite(v) && v >= lo && v <= hi) ? v : null;
@@ -8219,7 +8226,14 @@ function sanitizeCache(c){
     corpEvents: Array.isArray(c.corpEvents) ? c.corpEvents.slice(-120)
       .filter(e => e && typeof e === 'object' && !Array.isArray(e)
                 && typeof e.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.date))
-      .map(e => ({ kind: (e.kind === 'cut' ? 'cut' : 'div'), date: e.date,
+      /* v92b（亂數壓力測試抓到的）：這裡本來寫 `e.kind === 'cut' ? 'cut' : 'div'`——
+         也就是**任何看不懂的 kind 都會被當成除權息**。
+         現場路徑（autoTxns）對看不懂的 kind 是直接略過，兩邊對同一份資料給不同答案：
+         實測同一檔股票，存檔前現金股利 0 元，存檔重開之後變成 12,150 元。
+         備份檔是純文字 JSON、使用者會自己編輯，打錯一個字就會憑空生出一筆股利。
+         「看不懂就當成配息」是這個專案一路在拔的那種預設值。改成看不懂就丟掉，並且數出來。 */
+      .filter(e => { const ok = e.kind === 'cut' || e.kind === 'div'; if(!ok) _corpDropped++; return ok; })
+      .map(e => ({ kind: e.kind, date: e.date,
                    before:num(e.before,0.01,1e6), after:num(e.after,0.01,1e6),
                    amt:num(e.amt,-1e4,1e4),
                    type: e.type ? String(e.type).slice(0,40) : '',
@@ -8298,6 +8312,7 @@ function applySnapshot(o, opts={}){
   // 先驗證再動手，避免半途失敗把現有清單毀掉
   const clean = [];
   let skipped = 0, badFmt = 0, txnDropped = 0, txnDateBad = 0;
+  _corpDropped = 0;
   for(const w0 of o.watch){
    try{
     const w = w0;
@@ -8436,6 +8451,7 @@ function applySnapshot(o, opts={}){
   state.lastImportSkipped = skipped;
   state.lastTxnDropped = txnDropped;
   state.lastTxnDateBad = txnDateBad;
+  state.lastCorpDropped = _corpDropped;
   state.lastRestoredData = restoredData;
   state.lastImportBadFmt = badFmt;
   return restored;
@@ -8459,9 +8475,10 @@ function restoreFromStore(){
        開機還原這條路一個字都沒有——於是「打開 app 發現持股少了兩筆」變成無聲的事件，
        而少掉的正是成本價，首屏的賺賠會直接跟著錯。原因要在原地講出來。 */
     state._restoreLoss = (state.lastImportBadFmt|0) + (state.lastImportSkipped|0)
-                       + (state.lastTxnDropped|0) + (state.lastTxnDateBad|0)
+                       + (state.lastTxnDropped|0) + (state.lastTxnDateBad|0) + (state.lastCorpDropped|0)
       ? { bad: state.lastImportBadFmt|0, skipped: state.lastImportSkipped|0,
-          txn: state.lastTxnDropped|0, dateBad: state.lastTxnDateBad|0 }
+          txn: state.lastTxnDropped|0, dateBad: state.lastTxnDateBad|0,
+          corp: state.lastCorpDropped|0 }
       : null;
     return n;
   }catch(e){
@@ -9995,7 +10012,8 @@ if(state._restoreLoss){
      金額一毛都沒少，變的是它們被當成「日期不詳」，於是不套用任何除權息與減資，
      排序也跟著不同。一句錯的後果描述會讓他往錯的方向去找問題。 */
   const gone = [L.skipped?`${L.skipped} 檔自選標的`:'', L.bad?`${L.bad} 個成本價或股數`:'',
-                L.txn?`${L.txn} 筆交易紀錄`:''].filter(Boolean).join('、');
+                L.txn?`${L.txn} 筆交易紀錄`:'',
+                L.corp?`${L.corp} 筆看不懂的除權息／減資紀錄`:''].filter(Boolean).join('、');
   setTimeout(()=>{
     if(gone)
       toast(`⚠ 這台裝置上的存檔有讀不回來的部分：${gone}。`
@@ -10577,6 +10595,10 @@ T('TC-014', '拿不到官方股價淨值比時，不可以假設面額 10 元', 
     + 'padding:16px;font-size:15px;line-height:1.6;color:#e2e8f0';
   box.innerHTML =
     `<div style="font-size:19px;font-weight:800;margin-bottom:4px">台股動物法則 · 內建自我測試</div>
+     <div style="font-size:13px;color:#64748b;margin-bottom:8px">
+       這一份檔案的版本：<strong style="color:#cbd5e1">${esc((document.getElementById('buildTag')||{}).textContent||'（讀不到）')}</strong>
+       —— 如果它不是你剛上傳的那一份，代表瀏覽器給你的是<strong style="color:#cbd5e1">快取的舊檔案</strong>，
+       請按 Ctrl＋Shift＋R 強制重抓（手機：長按重新整理鍵選「重新載入」）。</div>
      <div style="font-size:13px;color:#94a3b8;margin-bottom:12px">
        這一頁直接呼叫這個檔案裡真正的函式（不是另外複製一份）。
        測試期間<strong style="color:#e2e8f0">自動儲存已關閉，不會寫入你的資料</strong>；
@@ -10616,6 +10638,12 @@ T('TC-014', '拿不到官方股價淨值比時，不可以假設面額 10 元', 
 /* hashchange 也要接：使用者最自然的動作是「在網址列最後面加上 #selftest 再按 Enter」，
    而只改 hash 的話瀏覽器**不會重新載入頁面**——沒有這一行，他按了 Enter 什麼事都不會發生，
    而那正是他這幾輪一直遇到的「開了但跑不出來」。 */
+document.addEventListener('click', e=>{
+  const t = e.target && e.target.closest && e.target.closest('#selftestBtn');
+  if(t && !document.getElementById('selftestBox')){
+    try{ runSelfTest(); }catch(err){ console.error(err); }
+  }
+});
 window.addEventListener('hashchange', ()=>{
   if(location.hash === '#selftest' && !document.getElementById('selftestBox')){
     try{ runSelfTest(); }catch(e){ console.error(e); }
