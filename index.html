@@ -958,9 +958,12 @@
       <div class="hdr-tools">
         <div class="flex items-center gap-1 shrink-0 rounded-lg bg-slate-800/70 border border-slate-600 px-1" role="group" aria-label="調整全頁字級">
           <span class="text-[12px] text-slate-400 px-1">字級</span>
-          <button type="button" data-fs-set="sm"  data-fs-size="text-[12px]" class="fs-btn rounded text-[13px]">小</button>
-          <button type="button" data-fs-set="mid" data-fs-size="text-[14px]" class="fs-btn rounded text-[15px]">中</button>
-          <button type="button" data-fs-set="big" data-fs-size="text-[17px]" class="fs-btn rounded text-[18px]">大</button>
+          <!-- v93：原本叫「小／中／大」。預設是「中」，但使用者看到自己停在「中」、
+               旁邊還有一個「小」，容易以為畫面被縮過。改用描述用途的字：
+               標準＝一般人的正常尺寸、舒適＝想輕鬆一點、大字＝老花或想拿給長輩看。 -->
+          <button type="button" data-fs-set="sm"  data-fs-size="text-[12px]" class="fs-btn rounded text-[13px]">標準</button>
+          <button type="button" data-fs-set="mid" data-fs-size="text-[14px]" class="fs-btn rounded text-[15px]">舒適</button>
+          <button type="button" data-fs-set="big" data-fs-size="text-[17px]" class="fs-btn rounded text-[18px]">大字</button>
         </div>
         <button type="button" id="settingsBtn" aria-expanded="false" aria-controls="settingsPanel"
           class="btn btn-ghost shrink-0">設定</button>
@@ -978,7 +981,7 @@
            起因是很實際的一件事：改好的東西部署上去之前，畫面上完全看不出手上這份是哪一版，
            使用者以為沒改、我以為改了，兩邊各講各的。這一行由 build.sh 在建置時填入，
            不可能寫錯，也不會忘了更新。 -->
-      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v92 · 2026-08-19 23:56</span>
+      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v92 · 2026-08-20 00:19</span>
     </div>
 
     <!-- 設定：預設收合。裡面是 Token、登出、診斷、隱私、說明、示範資料、資料儲存、進階設定。 -->
@@ -1587,6 +1590,17 @@ const LBL_FETCH_ALL_W = '抓取最新資料';
 const LBL_FETCH_ALL_T = '抓取全部 100 檔';
 const REFRESH_ASK = 120;      // 一次要送出的請求數超過這個就先問過使用者
 
+/* v93：字級只有這一個地方決定預設值。
+   之前有兩處各自寫死 'big'（state 的初始值，以及 applyFontScale() 的 fallback），
+   那是「同一件事的第二份副本」——這個專案付過學費的那一類缺陷。
+   預設值本身也改了。v89 把預設設成 'big'，理由是「這一頁只有一位 78 歲使用者」；
+   那個假設現在收回了：定位改成「一般人看起來俐落，高齡者需要時再切大字」。
+   選 'mid' 不選 'sm'：'sm' 的說明文與圖例會掉到 9～11px，
+   對非高齡者也偏密；'mid' 在桌機不會鬆得像老人模式，在手機又比 'sm' 好讀。
+   只影響第一次使用——選過一次之後本機快照會還原他自己的選擇。 */
+const FS_LEVELS = ['sm','mid','big'];
+const DEFAULT_FS = 'mid';
+
 const state = {
   token: '',
   live: false,          // true = 真實 FinMind 數據
@@ -1619,17 +1633,12 @@ const state = {
   holderUnavailable: false,   // 集保資料集需 backer/sponsor，偵測到就整個工作階段停用
   quizGood: {},               // 心理快篩答對取得的正面動物（與 quiz 分開，避免污染計數）
   swanMode: 'add',            // 黑天鵝情境：add＝還在存錢每年投入；draw＝已退休每年提領
-  /* v89：預設從 'sm' 改成 'big'。
-     這一頁只有一位使用者：78 歲、老花、iPhone 系統字級已經調到最大。
-     實測預設 'sm' 時，畫面上有 170 個看得見的文字節點小於 14px，其中 103 個 ≤11.5px
-     ——區塊說明文 11px、動物圖鑑的觸發條件 9px。
-     而且 iPhone 的系統字級對這一頁**完全無效**：全頁字級都是絕對 px，
-     加上 -webkit-text-size-adjust:100% 關掉了 iOS 的自動放大。
-     也就是說他把手機字級調到最大這件事，在這一頁一點作用都沒有，
-     唯一能放大的是這一頁自己的「字級 小／中／大」，而它預設在「小」。
-     切到 'big' 之後小於 14px 的節點只剩 4 個，而且沒有橫向溢出（見 r13/fontsize89.mjs）。
-     已經自己選過字級的人不受影響——本機快照會把他的選擇還原回來。 */
-  fontScale: 'big',           // 全頁字級：sm／mid／big，存進本機
+  /* v89 曾經把預設設成 'big'，理由是「這一頁只有一位 78 歲使用者」。
+     v93 收回那個假設，預設值統一由上面的 DEFAULT_FS 決定（見那段註解）。
+     v89 當時量到的事實仍然成立、也仍然是大字模式存在的理由：
+     iPhone 的系統字級對這一頁**完全無效**（全頁絕對 px ＋ -webkit-text-size-adjust:100%），
+     所以「字級 標準／舒適／大字」是這一頁唯一能放大的開關。 */
+  fontScale: DEFAULT_FS,      // 全頁字級：sm／mid／big，存進本機
   /* v92：持倉資料上一次真的改變的時刻（ISO 字串）。跟 savedAt 不同——
      savedAt 只是「這台上一次寫入」，光是打開 app 就會更新它。 */
   dataAt: null,
@@ -7382,7 +7391,7 @@ function renderBlockC(){
   }
 }
 
-const FS_LEVELS = ['sm','mid','big'];
+/* FS_LEVELS 與 DEFAULT_FS 宣告在 state 之前（state 的初始值要用到 DEFAULT_FS）。 */
 /* v85：表格塞不下時，畫面上必須看得出「右邊還有東西」。
    實測 1280 ＋ 字級「大」：右邊 110px 被切掉，而頁面層級沒有捲軸，
    使用者只會覺得「操作那一欄不見了」。 */
@@ -7401,7 +7410,7 @@ function markScrollable(){
   });
 }
 function applyFontScale(){
-  const v = FS_LEVELS.includes(state.fontScale) ? state.fontScale : 'big';
+  const v = FS_LEVELS.includes(state.fontScale) ? state.fontScale : DEFAULT_FS;
   state.fontScale = v;
   if(v === 'sm') document.documentElement.removeAttribute('data-fs');
   else document.documentElement.setAttribute('data-fs', v);
