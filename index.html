@@ -981,7 +981,7 @@
            起因是很實際的一件事：改好的東西部署上去之前，畫面上完全看不出手上這份是哪一版，
            使用者以為沒改、我以為改了，兩邊各講各的。這一行由 build.sh 在建置時填入，
            不可能寫錯，也不會忘了更新。 -->
-      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v92 · 2026-08-20 08:36</span>
+      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v92 · 2026-08-20 08:51</span>
     </div>
 
     <!-- 設定：預設收合。裡面是 Token、登出、診斷、隱私、說明、示範資料、資料儲存、進階設定。 -->
@@ -1795,14 +1795,14 @@ const ANIMAL_EV = {
 const ANIMAL_META = [
   { k:'bull', e:'🐂', n:'公牛', src:'market', ev:'def', pair:'bear',
     ttl:'牛在跑｜整體市場氣氛偏強',
-    st:'加權指數（全台灣股票的平均行情）現在比它「最近一年的平均」還高。',
+    st:'加權指數（代表台股整體行情的大盤指數）現在比它「最近一年的平均」還高。',
     you:'市場整體在長期平均之上，通常代表大家比較敢買。<strong>但這是講「整個市場」，不是講你手上這幾檔</strong>——市場好，你的股票照樣可能在賠。',
     can:'照自己原本的計畫投資，<strong>別因為大家都在漲就追高</strong>。想知道某一檔現在算貴還算便宜，往下看那一檔自己的「便宜／合理／偏貴參考價」。',
     tr:'加權指數收盤價 ≥ 240 日均線（俗稱年線）。',
     lim:'年線只描述「現在的指數比過去一年的平均高或低」。它不知道基本面、資金面，也不知道你手上是哪幾檔。' },
   { k:'bear', e:'🐻', n:'公熊', src:'market', ev:'def', pair:'bull',
     ttl:'熊出沒｜現在市場比較低迷',
-    st:'加權指數（全台灣股票的平均行情）已經跌到它「最近一年的平均」以下，市場氣氛偏弱。',
+    st:'加權指數（代表台股整體行情的大盤指數）已經跌到它「最近一年的平均」以下，市場氣氛偏弱。',
     you:'價格可能比之前便宜了，<strong>但「看到熊」不等於「該買」</strong>。市場低迷有時候是暫時的情緒，有時候是真的有事發生，這一頁分不出來。',
     can:'想長期投資的話，往下看你想買的那一檔自己的「便宜參考價」；<strong>與其猜最低點，可以考慮分批，而不是一次押滿</strong>。如果你本來就有固定扣款的習慣，這裡也沒有出現要你停下來的理由。',
     tr:'加權指數收盤價 &lt; 240 日均線（俗稱年線）。',
@@ -3816,20 +3816,82 @@ function archetypeOf(ind){
 }
 /* 判定基準的優先序：① 個股自身歷史分位 ② 同業橫斷面中位數 ③ 產業慣用區間
    越前面的越接近「資料自己說的」，越後面的越接近「別人的經驗法則」。 */
+/* v93：三張價格卡的第一句話（給小白看的那句）必須跟著 basis 走。
+   舊版三張卡都寫死「這檔自己近 X 年」「以這家公司自己過去的估值來看」，
+   但 peBands 其實有三層 fallback：自身歷史 → 同業中位數 → 產業慣例。
+   一檔上市不久、歷史不足的股票，實際是拿同產業 7 檔算出來的，
+   小白看到的第一句卻說「這家公司自己過去的低檔」——那是資料血緣說錯，
+   而且在「白話在上、證據在下」的版面裡，下面那行小字的「倍數基準」救不回來。
+   所以文案跟著 basis 生成，不要在卡片裡加 if。
+
+   順帶更正一個統計翻譯：fair 用的是 P50（中位數），不是眾數。
+   舊文案寫「過去最常出現的估值位置」——雙峰分布時中位數那一格反而可能很少出現。
+   中位數的正確白話是「一半的時間比它便宜，一半比它貴」。 */
+const PE_BASIS_COPY = {
+  self: {
+    src:  '這家公司自己過去的本益比',
+    cheap:'以這家公司<strong>自己過去</strong>的估值來看，跌到這裡算進入相對便宜的一段。',
+    fair: '大約在<strong>歷史的中間</strong>：過去約有一半的時間比它便宜，一半比它貴。',
+    rich: '已經進到它<strong>自己歷史上</strong>相對昂貴的區域。<strong>貴不等於會跌</strong>，只是你付的價格裡「期待」的成分比較多。' },
+  ind: {
+    src:  '同產業其他公司的本益比中位數',
+    warn: '這一檔<strong>自己的歷史不夠長</strong>，所以下面三個價格是拿<strong>同產業其他公司</strong>比出來的，不是它自己的歷史。',
+    cheap:'跟<strong>同產業其他公司</strong>比，跌到這裡算相對便宜的一段。（不是拿它自己的歷史算的）',
+    fair: '大約在<strong>同業的中間</strong>：同產業裡約有一半的公司比它便宜，一半比它貴。',
+    rich: '跟<strong>同產業其他公司</strong>比已經算貴。<strong>貴不等於會跌</strong>，而且同業之間本來就可能有合理的差距。' },
+  /* 舊快取沒有 basis 時用這一組：不宣稱任何來源，只說算法。
+     寧可少講一句，也不要說錯是誰的歷史。 */
+  unknown: {
+    src:  '（這筆資料是舊版存下來的，看不出倍數基準）',
+    warn: '這幾個價格是<strong>舊版存下來的</strong>，看不出倍數是用這家公司自己的歷史、同業、還是產業慣例算的。按「更新顯示中的」重新抓一次就會恢復。',
+    cheap:'相對偏低的價位。<strong>倍數基準不明</strong>，請重新抓取資料後再看。',
+    fair: '中間的價位。<strong>倍數基準不明</strong>，請重新抓取資料後再看。',
+    rich: '相對偏高的價位。<strong>倍數基準不明</strong>，請重新抓取資料後再看。' },
+  conv: {
+    src:  '這一類產業常見的估值範圍（業界經驗法則）',
+    warn: '這一檔<strong>連同業資料都不夠</strong>，所以下面三個價格只能先用<strong>這一類產業常見的估值範圍</strong>套出來，可信度是三種算法裡最低的。',
+    cheap:'用<strong>這一類產業常見的範圍</strong>套出來的偏低價位。這只是經驗法則，<strong>沒有回測</strong>。',
+    fair: '用<strong>這一類產業常見的範圍</strong>套出來的中間價位。這只是經驗法則，<strong>沒有回測</strong>。',
+    rich: '用<strong>這一類產業常見的範圍</strong>套出來的偏高價位。這只是經驗法則，<strong>沒有回測</strong>。' }
+};
+/* 計算依據那一行的括號內容也跟著 basis 走，不再寫死「這檔自己近 X 年」。
+
+   注意 t.bands 會被存進本機快取與備份檔，所以有可能讀到 v93 之前存的、
+   **沒有 copy 欄位**的舊物件。那時候 bcp.cheap 會直接丟 TypeError，
+   整個目標價面板變空白——比文案錯還糟。所以一律走 peCopy() 由 basis 反查，
+   舊快取只要還有 basis 就救得回來；連 basis 都沒有就退回不宣稱來源的說法。 */
+function peCopy(b){
+  return (b && b.copy) || (b && PE_BASIS_COPY[b.basis]) || PE_BASIS_COPY.unknown;
+}
+function PE_BASIS_SUB(b, which){
+  const yrs = b.n ? (b.n/250).toFixed(1) : null;
+  if(!b.basis) return '';
+  if(b.basis === 'self'){
+    if(which === 'cheap') return `這檔自己近 ${yrs} 年本益比的低檔`;
+    if(which === 'fair')  return '這檔自己歷史的中位數（第 50 百分位）';
+    return '這檔自己歷史的第 80 百分位';
+  }
+  if(b.basis === 'ind'){
+    if(which === 'cheap') return `同產業 ${b.n} 檔的中位數往下（區間寬窄取自產業慣例）`;
+    if(which === 'fair')  return `同產業 ${b.n} 檔的中位數`;
+    return `同產業 ${b.n} 檔的中位數往上（區間寬窄取自產業慣例）`;
+  }
+  return '這一類產業常見的估值範圍，業界經驗法則、未經回測';
+}
 function peBands(ind, d){
   const hb = d && histBands(d.perHist);
   if(hb && perTrending(d.perHist))
-    return { ...hb, basis:'self', trending:true,
+    return { ...hb, basis:'self', trending:true, copy:PE_BASIS_COPY.self,
       label:`⚠ 這檔的本益比在近 ${(hb.n/250).toFixed(1)} 年是一條「持續上修或下修的趨勢」，不是一個穩定的區間。用分位數比較會系統性地說它「便宜」，請格外小心（實際區間 ${hb.lo}～${hb.hi} 倍）`,
       short:'自身歷史分位（趨勢中）' };
-  if(hb) return { ...hb, basis:'self',
+  if(hb) return { ...hb, basis:'self', copy:PE_BASIS_COPY.self,
     label:`這檔自己近 ${(hb.n/250).toFixed(1)} 年的本益比分布（${hb.n} 個交易日，實際區間 ${hb.lo}～${hb.hi} 倍）`,
     short:'自身歷史分位' };
   const im = industryMedianPE(ind, d && d.id);
   const A = archetypeOf(ind);
   const rLo = A.lo / A.mid, rHi = A.hi / A.mid;    // 慣例只借「區間寬窄」，中軸用真實資料
   if(im) return { cheap:+(im.med*rLo).toFixed(1), fair:im.med, rich:+(im.med*rHi).toFixed(1),
-    basis:'ind', n:im.n,
+    basis:'ind', n:im.n, copy:PE_BASIS_COPY.ind,
     /* v85：這裡的 ind 來自「備份檔或 FinMind 回應」，過去直接拼進字串，
        而這個 label 會經由 basisNote → valuate().note → tacticFor().body → innerHTML。
        實測用一個惡意備份檔（ind = <iframe onload=...>）可以在本頁執行任意 JS，
@@ -3837,7 +3899,7 @@ function peBands(ind, d){
        同一個 label 在別處是有 esc 的，只漏了這條分支：又是「N 份副本、其中一份沒跟上」。 */
     label:`同產業 ${im.n} 檔裡排在正中間那一檔的本益比是 ${im.med} 倍（${esc(String(ind))}；術語：同業中位數），區間寬窄取自「${esc(A.name)}」慣例`,
     short:'同業中位數' };
-  return { cheap:A.lo, fair:A.mid, rich:A.hi, basis:'conv', n:0,
+  return { cheap:A.lo, fair:A.mid, rich:A.hi, basis:'conv', n:0, copy:PE_BASIS_COPY.conv,
     label:`${A.name} 的產業慣用區間 ${A.lo}～${A.hi} 倍（業界經驗法則，未經回測）`,
     short:'產業慣例' };
 }
@@ -4222,7 +4284,9 @@ function restoreConnection(){
    還是要按一下才會連——對一位 78 歲的使用者來說，那一下就是每天都要重學一次的步驟。
 
    為什麼自動更新是「一天一次」而不是「每次打開」：
-   FinMind 免費方案每小時 600 次，自選清單有填成本的每檔要 7 次。
+   FinMind 免費方案每小時 600 次，加入自選的每檔要 7 次。
+   （v93 更正：條件是「已加入自選」，不是「有填成本」——v65 起實際的請求條件就只看 s.inWatch，
+    這段說明一直沒跟上。額度數字本身沒錯，callsPerStock() 是動態算的。）
    十檔就是 70 次，一小時內開九次就撞上限，然後整頁變成額度錯誤——
    而這個 app 的使用者沒有任何辦法自己排除那種狀況。
    連線本身只花 1 次最便宜的請求（silentReverify），那個每次開都做沒問題。
@@ -4860,7 +4924,7 @@ async function fetchStockLive(s){
     }catch(e){ if(isFatal(e)) throw e; out.fcfNote = out.fcfNote || ('現金流量表抓取失敗：' + e.message); }
   }
 
-  /* 6-3b 除權息與減資（官方）—— 只對「已加入自選且有填成本」的標的抓，
+  /* 6-3b 除權息與減資（官方）—— 只對「已加入自選」的標的抓，
      百大資料庫那 100 檔不需要，額度控制得住。
      舊版是用「單日跳空 > 10.5%」去猜，這裡直接拿官方的配息金額與減資後參考價，
      所以能算得出「你的成本應該調整成多少」，而不只是提醒你自己去查。 */
@@ -5384,7 +5448,8 @@ async function refreshRealtime(){
    6-B. 批次抓取：一次把整份清單抓完（含進度、併發控制與中止）
    ══════════════════════════════════════════════════════════════ */
 /* 每檔的請求數：價格 + 官方PER + 財報 + 資產負債表（+集保，免費帳號會自動停用）。
-   自選清單且有填成本的標的另加 2 次（除權息、減資），百大資料庫不加。 */
+   已加入自選的標的另加 3 次（除權息、減資、現金流量表），百大資料庫不加。
+   v93：這一段以前寫「有填成本」，跟真正發請求的條件（s.inWatch）不一致。 */
 /* 每檔的請求數。自選標的多三個：除權息、減資、現金流量表。
    v65 修正兩件事：
    ① 舊版呼叫端傳的是「inWatch 且有填成本」，但程式裡這三個請求的條件是 s.inWatch（不看成本），
@@ -6463,13 +6528,21 @@ function targetPanelHTML(s){
      這裡是全站行動指示最具體的畫面，必須跟燈號同步。 */
   const trapped = (valuate(d.pe, d).key === 'trap');
   const bnd = (t.bands || peBands(d.ind, d));
+  const bcp = peCopy(bnd);
 
   return `
-  ${warnBox('下面的價格是「算式的答案」，不是「該買賣的價格」', `
+  ${/* v93：舊文寫「本頁不提供買賣建議」，但這一頁往下幾行就寫著
+        「如果你本來就打算長期持有，可以考慮分批」——那就是建議。
+        兩句不能同時成立，而小白不會去分辨法律語意，他只會覺得前後矛盾。
+        所以把這句話改準：這一頁給的是**規則化的參考**，不是**針對你個人的投資建議**。
+        該守的界線一個字都沒有放寬（不推介個股、不保證報酬、不因你的操作獲利）。 */''}
+  ${warnBox('下面的價格是「算式的答案」，不是「保證會到的價格」', `
     它們只是把公開的本益比、平均價與擺動幅度代進公式算出來的數字。<br>
     這些公式<strong>不知道</strong>這家公司接下來會發生什麼事，也<strong>不知道</strong>你幾歲、這筆錢什麼時候要用、能承受多少虧損。<br>
-    本頁不推介任何個股、不提供買賣建議、不保證任何報酬，也不會因為你的任何操作而獲得任何報酬。<br>
-    <strong>看到綠色不代表可以買，看到紅色不代表必須賣。</strong><br>
+    本頁提供的是<strong>規則化的價格與操作參考</strong>——條件寫在旁邊，公式與資料來源都查得到。
+    但那<strong>不是針對你個人財務狀況量身制定的投資建議</strong>：本頁不推介任何特定個股、不保證任何報酬，
+    也不會因為你的任何操作而獲得任何報酬。<br>
+    <strong>看到綠色不代表可以買，看到紅色不代表必須賣。</strong>下面的建議都是條件句——前提不成立，結論就不成立。<br>
     ⚠ 台股單日漲跌幅上限 ±10%。這些價位不代表你掛得到單——連續跌停時買不到、連續漲停時賣不掉。
     若這檔被列為「處置股票」，撮合會變成 5 或 20 分鐘一次並須預收全額款券。下單前請向你的營業員確認交易狀態。`)}
   <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -6511,19 +6584,21 @@ function targetPanelHTML(s){
       </div>
       <div class="text-[10px] text-slate-500 mt-1">倍數基準：${esc(bnd.label)}</div>
       ` : `
+      ${bcp.warn ? `<div class="rounded-lg border-2 border-amber-500/60 bg-amber-500/10 text-amber-100 p-2.5 mb-2 text-[13px] leading-relaxed">
+        <div class="font-bold mb-0.5">⚠ 下面三個價格不是用這家公司自己的歷史算的</div>${bcp.warn}</div>` : ''}
       <div class="grid grid-cols-3 gap-2 pxgrid">
         ${trapped
           ? card('⚠️ 這一檔的便宜價不能用', t.cheap, `EPS × ${bnd.cheap} 倍`, 'text-amber-300', 'border-amber-500/35 bg-amber-500/[.08]',
                  '近 4 季獲利逐季下滑，這個數字看起來便宜是因為用了還沒掉下來的舊獲利，不能當便宜價看。')
-          : card('🟢 便宜參考價', t.cheap, `EPS × ${bnd.cheap} 倍（這檔自己近${bnd.n?(bnd.n/250).toFixed(1):'—'}年本益比的低檔）`,
+          : card('🟢 便宜參考價', t.cheap, `EPS × ${bnd.cheap} 倍（${PE_BASIS_SUB(bnd,'cheap')}）`,
                  'text-emerald-300', 'border-emerald-500/35 bg-emerald-500/[.08]',
-                 '以這家公司<strong>自己過去</strong>的估值來看，跌到這裡算進入相對便宜的一段。', '元以下')}
-        ${card(trapped?'⚠️ 這一檔的合理價僅供參考':'🟡 合理參考價', t.fair, `EPS × ${bnd.fair} 倍（歷史中間值）`,
+                 bcp.cheap, '元以下')}
+        ${card(trapped?'⚠️ 這一檔的合理價僅供參考':'🟡 合理參考價', t.fair, `EPS × ${bnd.fair} 倍（${PE_BASIS_SUB(bnd,'fair')}）`,
                'text-amber-300', 'border-amber-500/35 bg-amber-500/[.08]',
-               '接近它過去最常出現的估值位置，不特別貴也不特別便宜。', '左右')}
-        ${card(trapped?'⚠️ 這一檔的偏貴價僅供參考':'🔴 偏貴參考價', t.rich, `EPS × ${bnd.rich} 倍（這檔自己歷史的第 80 百分位）`,
+               bcp.fair, '左右')}
+        ${card(trapped?'⚠️ 這一檔的偏貴價僅供參考':'🔴 偏貴參考價', t.rich, `EPS × ${bnd.rich} 倍（${PE_BASIS_SUB(bnd,'rich')}）`,
                'text-rose-300', 'border-rose-500/35 bg-rose-500/[.08]',
-               '已經進到它自己歷史上相對昂貴的區域。<strong>貴不等於會跌</strong>，只是你付的價格裡「期待」的成分比較多。', '元以上')}
+               bcp.rich, '元以上')}
       </div>
       ${(() => {
         /* v93（使用者定的第三層）：「條件式建議」。
@@ -8225,7 +8300,7 @@ const GUIDE = [
    ['💾 資料儲存','自選清單與持倉會自動存在你的瀏覽器裡，<strong>下次打開不必重輸</strong>；也可匯出備份檔帶到別台電腦。詳見「🔐 分享與隱私」分頁。<span class="text-amber-300">注意：在嵌入式預覽視窗中無法儲存，需下載到電腦開啟。</span>']
   ]) +
   NOTE('amber','⚡ 為什麼要限制單頁 5 檔？',
-   `本頁對「幾乎不變」的資料做了快取（股名與產業 7 天、財報與除權息 12 小時、價格與本益比 30 分鐘、集保 6 小時），同一筆請求同時發出多次時也會合併成一次。快取只存在記憶體，重新整理就清空。<br>FinMind 免費方案的上限是<strong>每小時 600 次</strong>（未註冊 300 次），實際額度請到會員頁查看「api 每小時使用上限」。百大清單的股票每檔需要 <strong>${callsPerStock(false)}</strong> 次請求，一次查 100 檔就是 ${callsPerStock(false)*100} 次，<strong>約佔免費額度的 ${Math.round(callsPerStock(false)*100/600*100)}%</strong>；<strong>自選清單有填成本的標的每檔是 ${callsPerStock(true)} 次</strong>（多抓 5 年序列、除權息與減資）。這幾個數字是程式當場算出來的，不是寫死的——舊版寫「4 次／7 次／400 次／67%」，那是 TaiwanStockPER 加進來之前的數字，系統性低估了四分之一。分頁抓取讓你把額度花在真正在看的股票上。若額度充足也可用「抓取全部」一次抓完——額度用盡時系統會立即中止並降級連線狀態，不會把剩餘額度打完。`)
+   `本頁對「幾乎不變」的資料做了快取（股名與產業 7 天、財報與除權息 12 小時、價格與本益比 30 分鐘、集保 6 小時），同一筆請求同時發出多次時也會合併成一次。快取只存在記憶體，重新整理就清空。<br>FinMind 免費方案的上限是<strong>每小時 600 次</strong>（未註冊 300 次），實際額度請到會員頁查看「api 每小時使用上限」。百大清單的股票每檔需要 <strong>${callsPerStock(false)}</strong> 次請求，一次查 100 檔就是 ${callsPerStock(false)*100} 次，<strong>約佔免費額度的 ${Math.round(callsPerStock(false)*100/600*100)}%</strong>；<strong>已加入自選的標的每檔是 ${callsPerStock(true)} 次</strong>（多抓 5 年序列、除權息、減資與現金流量表）。<span class="text-amber-300">v93 更正：這裡以前寫「有填成本」，但實際上只要加入自選就會多抓，不看有沒有填成本。</span>這幾個數字是程式當場算出來的，不是寫死的——舊版寫「4 次／7 次／400 次／67%」，那是 TaiwanStockPER 加進來之前的數字，系統性低估了四分之一。分頁抓取讓你把額度花在真正在看的股票上。若額度充足也可用「抓取全部」一次抓完——額度用盡時系統會立即中止並降級連線狀態，不會把剩餘額度打完。`)
 },
 
 { k:'animals', t:'🦁 17 動物法則', html: ()=>
