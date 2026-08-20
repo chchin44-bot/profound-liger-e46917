@@ -400,7 +400,14 @@
      在 320px 這種窄螢幕上會比容器寬 16px（實測 right=336 / clientWidth=320）。
      容器加 min-width:0 讓 flex/grid 子項可以縮，canvas 本身鎖 100%。 */
   canvas{ max-width:100% !important; }
-  #taiexChart, #swanChart{ width:100% !important; }
+  /* v93d：taiexChart 改由 .chartbox 控制尺寸，這裡不能再用 !important 綁死它的寬高
+     （會跟 Chart.js 自己寫的 inline style 打架，造成每次 resize 都重算的抖動）。 */
+  #swanChart{ width:100% !important; }
+  .chartbox{ position:relative; width:100%; height:100%; min-height:240px; }
+  /* Chart.js 的 responsive 模式是「量父層、然後自己寫 inline width/height」。
+     canvas 如果被 position:absolute 或用 !important 綁死尺寸，就會跟它打架
+     （量到 0 或每次 resize 都重算）。標準做法就是：父層 relative + 有高度，canvas 不要動。 */
+  @media (max-width:1023px){ .chartbox{ height:clamp(200px, 38vw, 300px); } }
   .glass, .glass > div, section > div{ min-width:0; }
 
   @media (max-width:768px){
@@ -992,7 +999,7 @@
            起因是很實際的一件事：改好的東西部署上去之前，畫面上完全看不出手上這份是哪一版，
            使用者以為沒改、我以為改了，兩邊各講各的。這一行由 build.sh 在建置時填入，
            不可能寫錯，也不會忘了更新。 -->
-      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v92 · 2026-08-20 12:47</span>
+      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v92 · 2026-08-20 15:54</span>
     </div>
 
     <!-- 設定：預設收合。裡面是 Token、登出、診斷、隱私、說明、示範資料、資料儲存、進階設定。 -->
@@ -1116,8 +1123,14 @@
       <button type="button" id="blockAEmptyBtn" class="btn btn-primary w-full">去輸入 FinMind Token</button>
     </div>
     <div id="blockAFull" class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      <!-- v93d（使用者回報「大盤的線太窄不好看」）：這一格是 4 欄網格裡的 col-span-3，
+           而網格預設 align:stretch，所以它的高度會被右邊那疊統計方塊撐到 400～500px。
+           但 canvas 寫死 height="118"，圖就只畫在最上面約四分之一，下面一大片空白。
+           改成用一個 relative 容器撐滿，Chart.js 關掉固定比例、跟著容器走。 -->
       <div class="lg:col-span-3 bg-slate-950/50 rounded-xl p-3 border border-slate-700/40">
-        <canvas id="taiexChart" role="img" aria-label="加權指數走勢圖；同樣的數字在右側的最新收盤、年線與乖離率欄位都有文字版本" height="118"></canvas>
+        <div class="chartbox">
+          <canvas id="taiexChart" role="img" aria-label="加權指數走勢圖；同樣的數字在右側的最新收盤、年線與乖離率欄位都有文字版本"></canvas>
+        </div>
       </div>
       <div class="space-y-2">
         <div class="grid grid-cols-2 gap-2">
@@ -1773,9 +1786,18 @@ function mockFundamentals(id){
      src  來源    —— 這個判斷的資料是誰的：市場、你的帳本、你的作答、你自己按的。
      ev   證據    —— 門檻是定義、還是本頁自己訂的沒有回測的數字。
      lim  限制    —— 這個判斷「不知道」什麼。
-     chk  該檢查  —— 建議你回頭重新確認什麼。這一欄可以有動詞，但只能是「檢查／確認／回想」，
-                     不能是「買／賣／加碼／布局／停損」——那需要知道你的年齡、資產與現金需求，
-                     而這一頁一項都不知道。
+     ttl  白話標題 —— 小白第一眼看到的那一句。
+     you  跟你有什麼關係 —— 把術語翻成生活語言。
+     can  可以怎麼做 —— 這一欄的界線（v93d 重新定義；原本寫「只能檢查／確認／回想」，
+                     太嚴，而且實作本來就對不上）：
+                     ✅ 檢查／確認／回想／寫下來
+                     ✅ **負向護欄**——「不要只憑這一個訊號買賣」「別因為大家都在漲就追高」
+                        「不要只看到鯨魚就買」。那是在教使用者怎麼正確**讀**這個訊號，不是叫他動作。
+                     ✅ 指路——告訴他具體價格在第二層、可以怎麼做在第三層。
+                     ❌ **正向操作建議**——「可以考慮分批投入」「加碼」「減碼」。
+                        那一類留在第三層（策略卡與價格區間），因為只有那一層有具體價位可以搭配。
+                     理由：第一層回答的是「發生什麼事」。動物標籤如果自己就給得出正向操作，
+                     使用者會停在第一層不再往下看——而第一層根本沒有價格。
      why  原因    —— 同一隻動物有多個觸發來源時，逐一列出。畫面上必須說出「這次是哪一個」，
                      不能讓使用者自己猜（🐖 與 🐋 都是這種）。
    ══════════════════════════════════════════════════════════════ */
@@ -1815,7 +1837,9 @@ const ANIMAL_META = [
     ttl:'熊出沒｜現在市場比較低迷',
     st:'加權指數（代表台股整體行情的大盤指數）已經跌到它「最近一年的平均」以下，市場氣氛偏弱。',
     you:'價格可能比之前便宜了，<strong>但「看到熊」不等於「該買」</strong>。市場低迷有時候是暫時的情緒，有時候是真的有事發生，這一頁分不出來。',
-    can:'想長期投資的話，往下看你想買的那一檔自己的「便宜參考價」；<strong>與其猜最低點，可以考慮分批，而不是一次押滿</strong>。如果你本來就有固定扣款的習慣，這裡也沒有出現要你停下來的理由。',
+    /* v93d：原本帶著「與其猜最低點，可以考慮分批，而不是一次押滿」——那是正向操作建議，
+       屬於第三層。留在動物卡上，使用者會停在第一層不再往下看，而第一層沒有價格可以搭配。 */
+    can:'<strong>不要只因為市場低迷就買，也不要只因為低迷就停手</strong>——這一層看不到任何一檔的價格。想長期投資的話，往下看你想買的那一檔自己的「便宜參考價」，那裡才會告訴你現在算不算便宜、以及可以怎麼做。如果你本來就有固定扣款的習慣，這裡沒有出現要你停下來的理由。',
     tr:'加權指數收盤價 &lt; 240 日均線（俗稱年線）。',
     lim:'年線不知道為什麼跌，也不知道會跌多久。歷史上長期報酬較好的位置是「平均」，而你只會經歷「一次」。' },
   { k:'deadcat', e:'🐱', n:'死貓', src:'market', ev:'obs',
@@ -3841,6 +3865,12 @@ function archetypeOf(ind){
 const PE_BASIS_COPY = {
   self: {
     src:  '這家公司自己過去的本益比',
+    /* v93d：策略卡（tacticFor 的 A/F 卡）以前寫死「這檔自己的便宜價」「自身歷史低檔區」，
+       但 peBands 有三條路。走同業或產業慣例時，那兩句就是在說一件沒發生的事——
+       跟 footer 的 'peer' 幽靈 key 是同一種漂移。這兩個短語讓策略卡也跟著 basis 走。 */
+    ref:  '這檔自己的便宜價',
+    zone: '自身歷史低檔區',
+    zoneHi:'自身歷史高檔區',
     foot: '便宜／昂貴的門檻是拿<strong>這一檔自己過去五年的本益比</strong>排出來的（官方資料，術語：歷史分位）',
     cheap:'以這家公司<strong>自己過去</strong>的估值來看，跌到這裡算進入相對便宜的一段。',
     fair: '大約在<strong>歷史的中間</strong>：過去約有一半的時間比它便宜，一半比它貴。',
@@ -3852,6 +3882,9 @@ const PE_BASIS_COPY = {
      不然「小白看到的第一句必須是真話」這個標準只做到一半。 */
   ind: {
     src:  '同產業其他公司的本益比中位數',
+    ref:  '拿同業中位數推出來的便宜價',
+    zone: '同業比較的低檔區（不是它自己的歷史）',
+    zoneHi:'同業比較的高檔區（不是它自己的歷史）',
     foot: '<strong class="text-amber-300">這一檔自己的歷史不夠長，門檻改用「同業中位數」當中心、再套產業慣例的區間寬窄，不是它自己的歷史</strong>',
     warn: '這一檔<strong>自己的歷史不夠長</strong>，所以下面三個價格是拿<strong>同產業其他公司</strong>的中間值當基準推出來的，不是它自己的歷史。',
     cheap:'以<strong>同產業公司的中間估值</strong>為中心，再套上這類產業常見的估值範圍——這個價位落在<strong>偏低</strong>的那一側。（不是拿它自己的歷史算的）',
@@ -3861,6 +3894,9 @@ const PE_BASIS_COPY = {
      寧可少講一句，也不要說錯是誰的歷史。 */
   unknown: {
     src:  '（這筆資料是舊版存下來的，看不出倍數基準）',
+    ref:  '便宜價（倍數基準不明）',
+    zone: '低檔區（倍數基準不明，請重新抓取資料）',
+    zoneHi:'高檔區（倍數基準不明，請重新抓取資料）',
     foot: '<strong class="text-amber-300">這筆資料是舊版存下來的，看不出門檻是用自身歷史、同業還是產業慣例算的——請按「更新顯示中的」重新抓取</strong>',
     warn: '這幾個價格是<strong>舊版存下來的</strong>，看不出倍數是用這家公司自己的歷史、同業、還是產業慣例算的。按「更新顯示中的」重新抓一次就會恢復。',
     cheap:'相對偏低的價位。<strong>倍數基準不明</strong>，請重新抓取資料後再看。',
@@ -3868,6 +3904,9 @@ const PE_BASIS_COPY = {
     rich: '相對偏高的價位。<strong>倍數基準不明</strong>，請重新抓取資料後再看。' },
   conv: {
     src:  '這一類產業常見的估值範圍（業界經驗法則）',
+    ref:  '用產業慣用區間套出來的便宜價',
+    zone: '產業慣用區間的低檔（未經回測）',
+    zoneHi:'產業慣用區間的高檔（未經回測）',
     foot: '<strong class="text-amber-300">這一檔自己的歷史不夠長，門檻用的是「產業慣用區間」——那是業界經驗法則，未經回測</strong>',
     warn: '這一檔<strong>連同業資料都不夠</strong>，所以下面三個價格只能先用<strong>這一類產業常見的估值範圍</strong>套出來，可信度是三種算法裡最低的。',
     cheap:'用<strong>這一類產業常見的範圍</strong>套出來的偏低價位。這只是經驗法則，<strong>沒有回測</strong>。',
@@ -3896,7 +3935,11 @@ function PE_BASIS_SUB(b, which){
     if(which === 'fair')  return `同產業 ${b.n} 檔的中位數`;
     return `同產業 ${b.n} 檔的中位數往上（區間寬窄取自產業慣例）`;
   }
-  return '這一類產業常見的估值範圍，業界經驗法則、未經回測';
+  /* v93d：這裡原本是「其他一律當成 conv」。unknown（舊快取、看不出基準）
+     也會掉進來，於是副標又猜錯一次來源——跟上面那三張卡是同一種病。
+     只有真的是 conv 才這樣說，其他一律留白：寧可少一行，不要說錯來源。 */
+  if(b.basis === 'conv') return '這一類產業常見的估值範圍，業界經驗法則、未經回測';
+  return '';
 }
 function peBands(ind, d){
   const hb = d && histBands(d.perHist);
@@ -3977,7 +4020,9 @@ function valuate(pe, d){
              note:`本益比 ${fmt(pe,1)} 倍落在 ${B.cheap}～${B.fair} 的「合理」區間，維持既有紀律，不追高不殺低。${basisNote}` };
   if(pe <= B.rich)
     return { level:'hold', key:'warm', light:'🟡', label:'偏貴區（牛熊拉鋸）', cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:B,
-             note:`本益比 ${fmt(pe,1)} 倍落在 ${B.fair}～${B.rich}，位階轉偏貴，停止加碼並觀察獲利是否跟上。${basisNote}` };
+             /* v93d：原文「停止加碼並觀察獲利是否跟上」——前半是資金配置指示，
+                這一頁不知道你的狀況，沒有資格下。後半（看獲利跟不跟得上）才是這裡真的知道的事。 */
+             note:`本益比 ${fmt(pe,1)} 倍落在 ${B.fair}～${B.rich}，位階轉偏貴。要判斷這個價格合不合理，看的是獲利有沒有跟上——不是價格本身。${basisNote}` };
   return { level:'sell', key:'rich', light:'🔴', label:'昂貴區', cls:'text-rose-300 bg-rose-500/10 border-rose-500/40', bands:B,
            note:`本益比 ${fmt(pe,1)} 倍高於昂貴門檻 ${B.rich}，位階「昂貴」。<strong>這一頁不提供任何減碼比例或資金去處的建議。</strong>${basisNote}` };
 }
@@ -6122,6 +6167,63 @@ function buildTargets(d){
   return t;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   第三層（策略卡）的單一事實來源（v93d）
+
+   跟 ANIMAL_META 同一個理由：說明頁那張「系統給的動作」表，以前是
+   tacticFor() 的**第二份手抄副本**。兩邊各自演化的結果是：
+     · 說明頁還寫 D 要「停止加碼、提高現金比」、W 要「停止加碼」、
+       G 要「照原計畫定期定額」——那是舊哲學的祈使句；
+     · 而 tacticFor() 早就改成陳述句與檢查動作，一句「停止加碼」都沒有。
+   使用者看說明頁學到一套，看實際卡片看到另一套。
+
+   現在 icon／title／情境／一句話說明只有這一份，tacticFor() 與說明頁都讀它。
+   卡片的 body 因為是動態模板（帶當下的價位），仍留在 tacticFor() 裡，
+   但說明頁不再重述 body——它只顯示 gist，所以沒有第二份會漂移的文案。
+
+   gist 的寫法遵守跟 ANIMAL_META.can 同一條界線：可以寫「先確認什麼」，
+   不寫「該買該賣多少」。 */
+const TACTIC_META = {
+  A: { icon:'📐', cond:'長線便宜 <strong>且</strong> 短線超賣',
+       title:d => `兩項同時成立：估值在${peCopy(peBands(d.ind,d)).zone} ＋ 短線跌破通道下軌`,
+       gist:'只陳述兩條公式<strong>目前</strong>算出的參考區間，並明說那不是回測結果、也不是要你投入資金。' },
+  C: { icon:'🐖', cond:'長線昂貴 <strong>且</strong> 短線超買',
+       title:'長短雙重過熱 — 估值與情緒同時在高檔',
+       gist:'只陳述「兩者同時在高檔」這個事實，不提供任何減碼比例或資金去處；另外提醒來回一趟的成本約 0.6%。' },
+  B: { icon:'💡', cond:'股價在年線之上 <strong>且</strong> 短線超買 <strong>且</strong> 長線非便宜',
+       title:'股價在年線之上，且觸及短線過熱區',
+       gist:'只陳述三個價位（布林上軌、季線、布林下軌）與它們各自代表什麼，不下結論。' },
+  D: { icon:'📉', cond:'跌破季線 5%',
+       title:'中期趨勢破壞 — 跌破季線防線',
+       gist:'指出防線價位，並要你自己去分辨這是「大盤系統性回檔」還是「這家公司出問題」——可以查的三個數字寫在卡片上（營收年增率、毛利率、負債比）。' },
+  R: { icon:'🐖', cond:'長線位階判定為昂貴',
+       title:'長線昂貴位階 — 不建議加碼',
+       gist:'安全閘：不論中短線訊號如何，這個狀態下一律不輸出加碼方向的價位。' },
+  E: { icon:'🐋', cond:'股價在季線附近 <strong>且</strong> 大戶連兩週增持 <strong>且</strong> 長線非昂貴',
+       title:'季線附近 ＋ 千張大戶連兩週增持',
+       gist:'只陳述「這個形態成立」，並寫出形態不成立的條件是什麼。籌碼那一條沒有幅度門檻，卡片會一併說明。' },
+  F: { icon:'🐂', cond:'長線便宜、短線尚未超賣',
+       title:d => `本益比位於${peCopy(peBands(d.ind,d)).zone}`,
+       gist:'只陳述位置與短線超賣的價位，並明說「估值低不代表股價不會再跌，也不代表獲利不會變差」。' },
+  W: { icon:'⚠️', cond:'本益比落在中位數與昂貴門檻之間（偏貴）',
+       title:'估值位於偏貴區間',
+       gist:'陳述現在的位置與合理價／短線過熱價。<strong>不寫「停止加碼」</strong>——那是對你資金配置的指示，本頁不知道你的狀況。' },
+  V: { icon:'⚠️', cond:'燈號已判定「本益比失真」或「金融業待取得 PBR」',
+       title:'不輸出任何調倉動作',
+       gist:'估值本身已知不可靠，用它算出來的買賣價位沒有意義，所以整段靜音；中線與短線照實輸出，它們只用收盤價算。' },
+  G: { icon:'📊', cond:'其餘情況',
+       title:'價值中樞區 — 維持紀律，等待訊號',
+       gist:'明說「這種區間本來就沒有明顯的訊號」，並建議把注意力放在營收與獲利有沒有變化，而不是每天的價格。' },
+  X: { icon:'⚠️', cond:'資料為示範值或已經過期',
+       title:'不輸出策略判定',
+       gist:'假數字或過期數字算出來的區間看起來一樣具體，卻可能早就不成立，所以完全不輸出。' },
+};
+/* 取這張卡的 icon 與 title；title 可能是函式（要看 basis 才知道怎麼稱呼那個區間）。 */
+function tac(k, d){
+  const m = TACTIC_META[k];
+  return { icon:m.icon, title: typeof m.title === 'function' ? m.title(d) : m.title };
+}
+
 function tacticFor(s){
   const d = s.data || {}, t = d.targets || {};
   const p = d.price;
@@ -6196,16 +6298,21 @@ function tacticFor(s){
     /* 舊版：「建議放大定期定額扣款，或動用預備現金分批加碼——不要一次全押，分 3～5 批…」
        ＝ 祈使句 ＋ 特定標的 ＋ 特定價格 ＋ 資金調度指示 ＋ 執行步驟。
        這是「分析意見」與「推介建議」的界線，四項全中。改成陳述句，數字一個不刪。 */
-    r = { key:'A', tone:'green', icon:'📐', title:'兩項同時成立：估值在自身低檔區 ＋ 短線跌破通道下軌',
-      body:`本益比 <strong>${fmt(d.pe,1)} 倍</strong>，低於這檔自己的便宜價 $${fmt(t.cheap,1)}；同時股價已經跌到比最近一個月平常的低點還低（$${fmt(t.shortBuy,1)} 以下）。<br>
-            歷史上出現這個組合時，$${fmt(Math.min(t.shortBuy,t.cheap),1)} ～ $${fmt(Math.max(t.shortBuy,t.cheap),1)} 是價格曾經停留過的區間。<br>
+    /* v93d：這張卡的正文原本寫「歷史上出現這個組合時，X～Y 是價格曾經停留過的區間」。
+       那是一句**統計宣稱**，但程式看得到的只有現在 shortBuy 與 cheap 這兩條線的 min/max，
+       從來沒有回測過「這個組合出現後價格怎麼走」。同一頁其他地方已經誠實承認
+       「本頁自己訂的、沒有回測」，這裡不該有第二套證據標準。
+       改成只講程式真的算得出來的事：目前兩條公式的參考區間。 */
+    r = { key:'A', tone:'green', ...tac('A', d),
+      body:`本益比 <strong>${fmt(d.pe,1)} 倍</strong>，低於${peCopy(peBands(d.ind,d)).ref} $${fmt(t.cheap,1)}；同時股價已經跌到比最近一個月平常的低點還低（$${fmt(t.shortBuy,1)} 以下）。<br>
+            這兩條公式目前算出來的參考區間是 $${fmt(Math.min(t.shortBuy,t.cheap),1)} ～ $${fmt(Math.max(t.shortBuy,t.cheap),1)}。<br>
             <strong>以上是對過去資料的描述，不是對未來的預測，也不是要你投入資金。</strong>
             要不要買、買多少、用哪一筆錢，本頁不知道你的狀況，無法也不會替你判斷。`,
-      moves:[`歷史價格曾停留的區間：$${fmt(Math.min(t.shortBuy,t.cheap),1)} ～ $${fmt(Math.max(t.shortBuy,t.cheap),1)}`,
+      moves:[`目前兩條公式算出的參考區間：$${fmt(Math.min(t.shortBuy,t.cheap),1)} ～ $${fmt(Math.max(t.shortBuy,t.cheap),1)}（不是回測結果）`,
              `跌破 $${fmt(t.midWarn,1)} 時，本頁的中期趨勢判定會翻轉為「破壞」`,
              `${midSt==='broken' ? '⚠ 這檔<strong>已經</strong>跌破季線 5%。本頁的另一套判定會把這叫做「中期趨勢破壞」，結論與這張卡相反——代表這是一個有爭議的位置，不是一個明確的位置。' : '若你正在考慮動用生活費或解約定存，請先跟家人談過。'}`] };
   } else if(longSt==='rich' && shortSt==='overbought'){
-    r = { key:'C', tone:'red', icon:'🐖', title:'長短雙重過熱 — 估值與情緒同時在高檔',
+    r = { key:'C', tone:'red', ...tac('C', d),
       body:`本益比 <strong>${fmt(d.pe,1)} 倍</strong> 已超過昂貴門檻（${fmt(peBands(d.ind,d).rich,1)} 倍），同時股價已經漲到比最近一個月平常的高點還高（$${fmt(t.shortSell,1)} 以上）。<br>
             估值與情緒同時位於歷史高檔區間。本頁只陳述這個事實，
             <strong>不對「該不該賣」「該賣多少」提供任何意見</strong>——那需要知道你的成本、資金用途與稅務狀況。`,
@@ -6215,7 +6322,7 @@ function tacticFor(s){
   } else if(aboveYear && shortSt==='overbought' && longSt!=='cheap'){
     /* 對稱安全閘：長線位階判定為便宜時，不論短線多超買都不得輸出減碼建議。
        （原本只擋「昂貴時加碼」，漏了「便宜時減碼」，會出現燈號說買、策略卡說賣的矛盾） */
-    r = { key:'B', tone:'amber', icon:'💡', title:'股價在年線之上，且觸及短線過熱區',
+    r = { key:'B', tone:'amber', ...tac('B', d),
       body:`股價 $${fmt(p,2)} 站在年線 $${fmt(d.ma240,2)} 之上，<strong>長線多頭格局不變 🐂</strong>；但短期已經漲到比最近一個月平常的高點還高（$${fmt(t.shortSell,1)}），短時間內衝得有點快。<br>
             本頁不對「該不該減碼」提供意見。以下只是三個由公式算出來的價位，以及它們與現價的距離。`,
       moves:[`短期漲過頭的價位（比最近一個月平常的高點還高）：$${fmt(t.shortSell,1)}`,
@@ -6223,7 +6330,7 @@ function tacticFor(s){
              `短期跌過頭的價位（比最近一個月平常的低點還低）：$${fmt(t.shortBuy,1)}`,
              `每一趟買賣的手續費與證交稅來回約 0.6%（ETF 約 0.4%），價差要先扣掉這一段才是你的`] };
   } else if(midSt==='broken'){
-    r = { key:'D', tone:'red', icon:'📉', title:'中期趨勢破壞 — 跌破季線防線',
+    r = { key:'D', tone:'red', ...tac('D', d),
       body:`股價 $${fmt(p,2)} 已跌破季線 5% 的中期防線 $${fmt(t.midWarn,1)}，波段趨勢遭到破壞。<br>
             值得先確認的是：這是「大盤系統性回檔」還是「這家公司基本面出問題」。${debtNote(s.ind, d.debt, s.id)}`,
       moves:[`站回季線的價位是 $${fmt(t.midBuy,1)}`,
@@ -6231,7 +6338,7 @@ function tacticFor(s){
              `本頁算出的長期便宜價是 $${fmt(t.cheap,1)}`] };
   } else if(longSt==='rich'){
     // 安全閘：長線位階已判定昂貴時，不論中短線訊號為何，都不得輸出加碼建議
-    r = { key:'R', tone:'red', icon:'🐖', title:'長線昂貴位階 — 不建議加碼',
+    r = { key:'R', tone:'red', ...tac('R', d),
       body:`本益比 <strong>${fmt(d.pe,1)} 倍</strong>已超過昂貴門檻（${fmt(peBands(d.ind,d).rich,1)} 倍），表格燈號同步顯示 🔴。<br>
             ${shortSt==='oversold' ? '短線雖然已經跌到比最近一個月平常的低點還低，但那只是「貴得比較少」，不是便宜——在高估值區搶反彈，賠率並不站在你這邊。<br>' : ''}
             ${midSt==='atMa60' && whale ? '雖然股價回到季線且千張大戶增持，<strong>但估值仍在昂貴區</strong>，籌碼面的支撐不能抵銷估值風險。<br>' : ''}
@@ -6242,26 +6349,26 @@ function tacticFor(s){
     /* 舊版只被 longSt==='rich' 擋，'warm'（偏貴）照樣輸出加碼指令；
        而且「加碼區間下緣」正好等於「停損價」，照做就是買在停損點上，
        同時「目標」還可能低於買價 6%。三個問題一起修。 */
-    r = { key:'E', tone:'green', icon:'🐋', title:'季線附近 ＋ 千張大戶連兩週增持',
+    r = { key:'E', tone:'green', ...tac('E', d),
       body:`股價回到季線 $${fmt(t.midBuy,1)} 附近，同時<strong>千張大戶連兩週增持（本週 +${fmt(d.holder,2)}%）</strong>。<br>
             本頁把這叫做一種「形態」，它描述的是已經發生的事，<strong>不代表接下來會漲，也不是要你買</strong>。`,
       moves:[`這個形態涵蓋的價格範圍：$${fmt(t.midWarn*1.01,1)} ～ $${fmt(Math.min(t.midBuy*1.02, t.longOk?t.fair:Infinity),1)}`,
              `跌破 $${fmt(t.midWarn,1)} 且大戶轉為減持時，這個形態就不成立了`,
              `${(t.longOk && t.fair > p) ? `本頁算出的長線合理價是 $${fmt(t.fair,1)}` : '⚠ 目前股價已經高於本頁算出的長線合理價，這個形態沒有向上的參考位置'}`] };
   } else if(longSt==='cheap'){
-    r = { key:'F', tone:'green', icon:'🐂', title:'本益比位於自身歷史低檔區',
-      body:`本益比 ${fmt(d.pe,1)} 倍，低於這檔自己的便宜價 $${fmt(t.cheap,1)}。短線尚未觸及超賣區。<br>
+    r = { key:'F', tone:'green', ...tac('F', d),
+      body:`本益比 ${fmt(d.pe,1)} 倍，低於${peCopy(peBands(d.ind,d)).ref} $${fmt(t.cheap,1)}。短線尚未觸及超賣區。<br>
             這是對目前位置的描述，不是買賣建議。`,
       moves:[`本頁定義的短線超賣位置：$${t.shortBuy!=null?fmt(t.shortBuy,1):'—'}`,
              `估值低不代表股價不會再跌，也不代表這家公司的獲利不會變差`] };
   } else if(longSt==='warm'){
-    r = { key:'W', tone:'amber', icon:'⚠️', title:'估值位於偏貴區間',
+    r = { key:'W', tone:'amber', ...tac('W', d),
       body:`本益比 <strong>${fmt(d.pe,1)} 倍</strong>位於 ${fmt(peBands(d.ind,d).fair,1)}～${fmt(peBands(d.ind,d).rich,1)} 倍的偏貴區間，尚未觸及賣出門檻，但也已經不便宜。<br>
             在這個位置買進，等於用未來的成長支付今天的溢價。本頁不對你的部位提供意見。`,
       moves:[`本頁算出的合理價：${t.longOk?`$${fmt(t.fair,1)}`:'資料不足，無法計算'}`,
              `${t.shortSell!=null?`本頁定義的短線過熱位置：$${fmt(t.shortSell,1)}`:'短線通道資料不足，無法計算'}`] };
   } else {
-    r = { key:'G', tone:'slate', icon:'📊', title:'價值中樞區 — 維持紀律，等待訊號',
+    r = { key:'G', tone:'slate', ...tac('G', d),
       body:`目前股價 $${fmt(p,2)} 位於各項防線之間，長線位階${
         t.longBroken ? '：本益比已脫離自身歷史區間，不列價位'
         : (t.longOk?`：便宜 $${fmt(t.cheap,1)} / 合理 $${fmt(t.fair,1)} / 昂貴 $${fmt(t.rich,1)}`:'資料不足')}。<br>
@@ -6979,7 +7086,7 @@ function drawTaiex(series, ma){
       ]
     },
     options:{
-      responsive:true, maintainAspectRatio:true, interaction:{mode:'index',intersect:false},
+      responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
       plugins:{ legend:{ labels:{ color:'#94a3b8', boxWidth:12, font:{size:11} } },
                 tooltip:{ backgroundColor:'#0f172a', borderColor:'#334155', borderWidth:1 } },
       scales:{
@@ -8384,8 +8491,9 @@ const GUIDE = [
      「適合分批建立部位」「應停止加碼、提高現金比重」「短線也該在此分批獲利了結」。
      免責條款自己失效比沒有免責更糟——它會讓使用者以為自己讀到的不是建議。 */
   P('這一頁給你的是<strong>具體的價格刻度</strong>，讓你自己判斷現在站在哪一格。三個維度分別回答三個不同的問題。<br>' +
-    '<strong class="text-amber-300">但要老實說：下面「意義」那一欄寫的是「適合分批建立部位」「應停止加碼」這一類的話，那就是建議。</strong>' +
-    '它們是依照上面那些公式機械推導出來的，沒有考慮你的年齡、現金需求、其他資產或健康狀況——這一頁完全不知道那些事。看它，但不要照著做。') +
+    '<strong class="text-amber-300">v93d 起，「意義」那一欄不再出現「應停止加碼」「該分批獲利了結」這一類的祈使句</strong>——' +
+    '它們是對資金配置的指示，而這一頁不知道你的年齡、現金需求、其他資產或健康狀況。<br>' +
+    '留下來的是價位本身與它代表的位置：那是機械推導的結果，看它，但要不要動、動多少，是你的判斷。') +
   H2('🏛️ 長期目標價 — 這家公司值多少錢？') +
   P('資料來源：綜合損益表<strong>最近 4 季累積 EPS</strong>。公式是最經典的本益比估值法。') +
   TABLE(['目標價','公式','意義'],[
@@ -8402,29 +8510,31 @@ const GUIDE = [
   H2('📊 中期目標價 — 波段趨勢還在嗎？') +
   TABLE(['目標價','公式','意義'],[
    ['🟢 季線（60 日均線）','最新 <strong>60MA 季線</strong>','股價回到季線、同時千張大戶連兩週增持。本頁把這叫做一種「形態」，它描述已經發生的事，不代表接下來會漲。'],
-   ['🔴 季線 −5%','60MA × <strong>0.95</strong>','跌破季線 5%，代表中線趨勢遭破壞。應停止加碼、提高現金比重。']
+   ['🔴 季線 −5%','60MA × <strong>0.95</strong>','跌破季線 5%，本頁把這個狀態叫做「中線趨勢遭破壞」。<br><span class="text-slate-400">v93d：原文接著寫「應停止加碼、提高現金比重」——那是對你資金配置的指示。策略卡實際上不會這樣說，它要你先分辨這是大盤系統性回檔還是這家公司出問題。</span>']
   ]) +
   H2('⚡ 短期目標價 — 情緒有沒有走極端？') +
   P('取<strong>過去 20 個交易日收盤價</strong>，算出 20MA 月線與標準差 σ（樣本標準差），構成布林通道。') +
   TABLE(['目標價','公式','意義'],[
    ['🟢 超賣買點（獵豹突襲 🐆）','20MA − 2σ（布林下軌）','短線極度超賣。在常態分配的<strong>假設下</strong>約 95% 的價格落在通道內；實證上股價報酬有厚尾與波動叢聚，實際涵蓋率約 88～90%，且 σ 隨波動率變動，<strong>在最需要這個訊號的極端行情中誤差最大</strong>。跌出下軌代表情緒走到相對極端。'],
-   ['🔴 超買賣點（死貓頂 🐱）','20MA + 2σ（布林上軌）','短線極度過熱。即使長線想抱，短線也該在此分批獲利了結，騰出資金等回檔。']
+   ['🔴 超買賣點（死貓頂 🐱）','20MA + 2σ（布林上軌）','短線極度過熱。<br><span class="text-slate-400">v93d：原文接著寫「短線也該在此分批獲利了結，騰出資金等回檔」——那是操作指示，而且「過熱之後會回檔」這件事本頁沒有回測過。策略卡實際上只陳述位置，並提醒來回一趟的成本約 0.6%。</span>']
   ]) +
   H2('🔄 動態調倉：長線持股 × 短線價差') +
   P('把三個維度疊起來，就得到具體策略。系統會依下列<strong>優先序</strong>判定並顯示對應卡片：') +
-  TABLE(['優先序','情境','系統給的動作'],[
-   ['A','長線便宜 <strong>且</strong> 短線超賣','📐 <strong>兩項同時成立</strong>：估值在自身低檔區、短線跌破通道下軌。只陳述歷史上價格曾停留過的區間，不輸出任何資金配置指示。'],
-   ['C','長線昂貴 <strong>且</strong> 短線超買','🐖 <strong>雙重過熱</strong>：估值與情緒同時在歷史高檔。本頁只陳述這個事實，不提供任何減碼比例或資金去處的建議。'],
-   ['B','股價在年線之上 <strong>且</strong> 短線超買 <strong>且</strong> 長線非便宜','💡 <strong>只陳述三個價位</strong>（布林上軌、季線、布林下軌）與它們跟現價的距離，不輸出任何減碼比例。（長線判定為便宜時<strong>不會</strong>走這張卡——那是一道對稱安全閘）'],
-   ['D','跌破季線 5%','📉 <strong>中期趨勢破壞</strong>：停止加碼、提高現金比，先確認是系統性回檔還是公司出事。'],
-   ['R','長線位階判定為昂貴（該檔自身近 5 年本益比的第 80 百分位以上；沒有足夠歷史時改用同業中位數或產業慣用區間換算，<strong>不是寫死的 20 倍</strong>）','🐖 <strong>不建議加碼</strong>：這是一道安全閘——只要估值判定為昂貴，不論中短線出現什麼訊號（包含大戶增持、跌到布林下軌），系統一律不輸出加碼建議。<strong>它排在 E 之前</strong>。'],
-   ['E','股價在季線附近 <strong>且</strong> 大戶連兩週增持 <strong>且</strong> 長線非昂貴','🐋 <strong>只陳述這個形態成立</strong>：技術面有支撐、籌碼面在吸貨。不輸出加碼指令；估值落在偏貴或昂貴區、或股價已高於合理價時，這張卡不會出現。'],
-   ['F','長線便宜、短線尚未超賣','🐂 <strong>本益比位於自身歷史低檔區</strong>：只陳述位置與短線超賣的價位，不輸出任何加碼指令。'],
-   ['W','本益比落在中位數與昂貴門檻之間（偏貴）','⚠️ <strong>停止加碼，維持觀察</strong>：尚未觸及賣出門檻，但也已經不便宜。'],
-   ['V','燈號已判定「本益比失真」或「金融業待取得 PBR」','⚠️ <strong>不輸出任何調倉動作</strong>：估值本身已知不可靠，用它算出來的買賣價位沒有意義。'],
-   ['G','其餘情況','維持紀律、照原計畫定期定額。這種區間擇時價值最低，紀律價值最高。'],
-   ['X','資料為示範值','不輸出任何操作建議。用假數字算出來的加碼區間看起來很具體，卻沒有參考價值。']
-  ]) +
+  /* v93d：這張表以前是 tacticFor() 的第二份手抄副本，兩邊各自演化到互相矛盾——
+     說明頁還寫 D「停止加碼、提高現金比」、W「停止加碼」、G「照原計畫定期定額」，
+     而程式裡早就沒有那些祈使句了。現在整張表由 TACTIC_META 生成，改文案只能改那一份。 */
+  TABLE(['優先序','情境','系統實際會說什麼'],
+    ['A','C','B','D','R','E','F','W','V','G','X'].map(k => {
+      const m = TACTIC_META[k];
+      const title = typeof m.title === 'function' ? '（依資料來源而定）' : m.title;
+      return [k, m.cond, `${m.icon} <strong>${title}</strong>：${m.gist}`];
+    })) +
+  NOTE('slate','為什麼這裡看不到「該買多少、該賣多少」',
+   '第三層會給你<strong>具體的價位與區間</strong>——那是這一頁真正有用的部分，不會拿掉。'
+   + '但它不會告訴你「投入多少錢」「減碼幾成」：那需要知道你的年齡、其他資產、這筆錢什麼時候要用、'
+   + '能承受多少波動，而這一頁一項都不知道。<br>'
+   + '<span class="text-amber-300">如果你在畫面上看到任何一句直接的祈使句（「停止加碼」「該賣了」），'
+   + '那是漏網的舊文案，請回報。</span>') +
   H2('📤 出場參考：加碼之後，什麼價位該考慮減碼？') +
   P('這是<strong>唯一一段不用公式、直接看這檔股票自己過去發生過什麼</strong>的區塊，位置在「🎯 目標價」視窗裡。做法是：找出過去五年當中，這檔股票的本益比落在<strong>跟今天差不多</strong>的那些日子，然後看它們往後 60 天與 120 天實際發生了什麼。') +
   TABLE(['欄位','它在回答什麼','怎麼讀'],[
