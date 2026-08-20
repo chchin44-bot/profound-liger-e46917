@@ -999,7 +999,7 @@
            起因是很實際的一件事：改好的東西部署上去之前，畫面上完全看不出手上這份是哪一版，
            使用者以為沒改、我以為改了，兩邊各講各的。這一行由 build.sh 在建置時填入，
            不可能寫錯，也不會忘了更新。 -->
-      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v92 · 2026-08-20 15:54</span>
+      <span id="buildTag" class="text-[12px] text-slate-600 tabular-nums" title="這一份檔案的版本與建置時間。回報問題時把這一行一起附上。">v93 · 2026-08-20 18:10</span>
     </div>
 
     <!-- 設定：預設收合。裡面是 Token、登出、診斷、隱私、說明、示範資料、資料儲存、進階設定。 -->
@@ -1832,7 +1832,9 @@ const ANIMAL_META = [
   { k:'bull', e:'🐂', n:'公牛', src:'market', ev:'def', pair:'bear',
     ttl:'牛在跑｜整體市場氣氛偏強',
     st:'加權指數（代表台股整體行情的大盤指數）現在比它「最近一年的平均」還高。',
-    you:'市場整體在長期平均之上，通常代表大家比較敢買。<strong>但這是講「整個市場」，不是講你手上這幾檔</strong>——市場好，你的股票照樣可能在賠。',
+    /* v93f：原文「通常代表大家比較敢買」——240MA 只能告訴你指數高於過去一年的平均，
+       觀察不到「誰敢不敢買」。改成只講價格位置。 */
+    you:'這是<strong>指數的價格位置</strong>：現在比過去一年的平均高。<strong>它不代表每一檔股票都強</strong>——市場在年線上方，你手上這幾檔照樣可能在賠。',
     can:'照自己原本的計畫投資，<strong>別因為大家都在漲就追高</strong>。想知道某一檔現在算貴還算便宜，往下看那一檔自己的「便宜／合理／偏貴參考價」。',
     tr:'加權指數收盤價 ≥ 240 日均線（俗稱年線）。',
     lim:'年線只描述「現在的指數比過去一年的平均高或低」。它不知道基本面、資金面，也不知道你手上是哪幾檔。' },
@@ -1850,7 +1852,9 @@ const ANIMAL_META = [
   { k:'deadcat', e:'🐱', n:'死貓', src:'market', ev:'obs',
     ttl:'貓在跳｜跌深後的一根急拉，但沒什麼人在買',
     st:'市場還在年線下方，今天卻突然大漲，可是成交量比平常少很多。',
-    you:'漲得多、買的人卻少，通常代表這一根不是很多人一起看好，比較像少數人推上來的。<strong>它可能是反彈，也可能真的止跌了——這一頁分不出來。</strong>',
+    /* v93f：原文「買的人卻少」「比較像少數人推上來」——成交量低只能證明
+       「成交的股數／金額相對少」，推不出買家人數，更推不出是誰在買。 */
+    you:'價格大漲，但<strong>成交量低於近 20 日的平均</strong>。這代表這一次上漲沒有伴隨較大的成交量——<strong>本頁不知道是誰在買，也不知道能不能延續。</strong>',
     can:'不要只因為突然大漲就追進去，<strong>等後面幾天的價格與成交量再確認一次</strong>。如果你要因為今天這根紅棒改變計畫，先問自己依據的是這家公司的哪一件事。',
     tr:'年線之下 ＋ 當日漲幅 &gt; 2% ＋ 成交量低於 20 日均量的 8 成。',
     lim:'「死貓反彈」的完整定義包含「之後又創新低」，那需要未來的價格才能確認——本頁確認不了，所以這只是形態描述，不是預測。' },
@@ -1894,7 +1898,9 @@ const ANIMAL_META = [
   { k:'horse', e:'🐎', n:'駿馬', src:'ledger', ev:'none', pair:'croc',
     ttl:'馬還在跑｜這筆賺了不少，而且還沒到偏貴',
     st:'這一筆持股的帳面獲利超過三成，而且價格還沒進到它自己歷史上偏貴的區域。',
-    you:'很多人賺了三成就想先落袋為安，結果賣完還繼續漲。<strong>這裡不是叫你續抱</strong>，只是提醒你：「已經賺很多」本身不是賣出的理由，你當初設的理由才是。',
+    /* v93f：原文「很多人賺了三成就想先落袋為安，結果賣完還繼續漲」是沒有來源的群體敘述。
+       要講的其實是一個邏輯關係：帳面獲利多少，跟估值高不高是兩件事。 */
+    you:'<strong>「已經賺很多」本身沒有告訴你估值是不是已經偏高</strong>，也沒辦法單獨回答該不該賣——那兩個是不同的問題。這裡不是叫你續抱，只是把它們分開。',
     can:'回想一下你當初打算什麼時候賣。想知道現在算不算貴，看下面這一檔的「偏貴參考價」。',
     tr:'未實現損益 <strong>&gt; +30%</strong>，而且長線位階不是「昂貴」。',
     lim:'系統<strong>沒有</strong>檢查任何趨勢、均線或動能——它只知道你賺了多少，以及本益比落在自己歷史的哪一格。它也不知道你為什麼買、打算抱多久。' },
@@ -1924,18 +1930,27 @@ const ANIMAL_META = [
   { k:'pig', e:'🐖', n:'豬', src:'market', ev:'none',
     ttl:'豬出現了｜這裡有「賺太多想更多」的風險',
     st:'這裡出現了一個貪婪過載類型的訊號。',
-    you:'兩種情況都會叫出這隻豬：價格相對它自己過去偏貴，或者你把太多錢押在同一檔上。<strong>成因完全不同，處理方式也不同。</strong>',
+    you:'兩種情況都會叫出這隻豬：長線估值落在高檔，或者你把太多錢押在同一檔上。<strong>成因完全不同，處理方式也不同。</strong>',
     can:'先看標籤上寫的是哪一個原因。',
-    tr:'本益比高於昂貴門檻，<strong>或</strong>單一持股佔總部位超過 30%。',
+    tr:'長線估值高於昂貴門檻（一般股看本益比、金融股看股價淨值比），<strong>或</strong>單一持股佔總部位超過 30%。',
     lim:'兩個條件的成因完全不同，一個講價格，一個講你的配置。',
     why:{
+      /* v93g：這一段原本寫死「相對它自己過去的估值」「跟它自己過去五年比」「本益比」。
+         但同一隻 🐖 可以由三種完全不同的尺叫出來——金融股是股價淨值比，
+         basis='ind' 比的是同業中位數，'conv' 比的是產業慣用區間。
+         第一層因此改成方法中立（只說「本頁採用的長線估值尺」），
+         實際用了哪一把尺、跟什麼比、量到多少，一律落到下面的證據層，
+         由 valuate() 回傳的 method／basis 現場生成，不再手抄。 */
       val:  { t:'估值過熱', src:'market',
               ttl:'豬出現了｜現在可能有點貴',
-              st:'這一檔目前的價格，相對它自己過去的估值已經偏高。',
-              you:'意思是：跟它自己過去五年比，現在買要付的錢算貴的那一段。<strong>貴不等於會跌</strong>，只是你付的價格裡「期待」的成分比較多。',
-              can:'如果想買，先別急著追，看一下下面的「偏貴參考價」在哪裡；如果已經持有，可以順便看看這一檔佔你總持股的比例會不會太高。<br><span class="text-slate-400">順帶查一件事：本益比變高可能是股價漲，也可能是獲利掉——後者要看的是財報，不是價格。</span>',
-              tr:'本益比高於「昂貴門檻」（這檔自己歷史的第 80 百分位，或同業／產業慣例的上緣）。',
-              lim:'第 80 百分位是本頁自己挑的門檻，沒有回測。景氣循環股在獲利谷底時本益比會很高，那不一定代表貴。' },
+              st:'這一檔目前的價格，用本頁採用的長線估值尺量起來，已經落在高檔位置。',
+              you:'意思是：用這一頁的尺量，現在買要付的錢算貴的那一段（這一次用的是哪一把尺、跟什麼比，寫在下面的證據裡）。<strong>貴不等於會跌</strong>，只是你付的價格裡「期待」的成分比較多。',
+              can:'如果想買，先別急著追，看一下下面的「偏貴參考價」在哪裡；如果已經持有，可以順便看看這一檔佔你總持股的比例會不會太高。<br><span class="text-slate-400">順帶查一件事：估值變高可能是股價漲上去，也可能是獲利或淨值掉下來——後者要看的是財報，不是價格。</span>',
+              /* tr／lim 一律不指名任何一把尺。指名了就會發生：金融股的卡片上寫著本益比、
+                 一般股的卡片上寫著股價淨值比——使用者讀到的是一把它其實沒用的尺。
+                 「這一次用的是哪一把」由上面的證據列現場填，那一列的來源是 valuate()。 */
+              tr:'長線估值高於本頁的「昂貴門檻」。這一次用的是哪一把尺、跟什麼比，寫在上面那幾列；門檻取這檔自己歷史的第 80 百分位，自身歷史不足時退到同業中位數或產業慣用區間的上緣。',
+              lim:'第 80 百分位是本頁自己挑的門檻，沒有回測。獲利掉到谷底的景氣循環股，估值倍數會被拉得很高，那不一定代表貴。門檻退到同業或產業慣例時，比的已經不是這一檔自己的歷史，參考價值更低。' },
       conc: { t:'持股太集中', src:'ledger',
               ttl:'豬出現了｜你把太多錢押在同一檔',
               st:'單一個股佔你填進來的總持股市值超過三成。',
@@ -3025,23 +3040,45 @@ function scheduleSessionNotice(){
    改一檔就讓另外五檔三週前的價格被標成「你今天填的」）在這裡用
    **每一檔各自的 asOf** 避開——它直接走既有的 staleDays／ageTag 老化管線。 */
 function dataReal(d){ return !!d && (d.src === 'live' || d.src === 'rt' || d.src === 'stale' || d.src === 'self'); }
-const VAL_NONE = { level:'na', key:'demo', light:'—', label:'尚未連線 · 無資料',
+const VAL_NONE = { level:'na', key:'demo', light:'—', label:'尚未連線 · 無資料', method:'none',
   cls:'text-slate-500 bg-slate-800/40 border-slate-700/50 border-dashed',
   note:`這檔目前沒有任何數值。請在上方輸入 FinMind Token 並按「驗證並連線」，再按「${LBL_REFRESH_W}」。` };
 /* 隱私模式如果只遮金額、卻留下位階燈號與目標價，那就是一套現成的「投顧講座簡報模式」：
    遮住自己的部位、留下綠燈與目標價、投影給台下看。這不是我們要提供的功能。 */
-const VAL_PRIV = { level:'na', key:'demo', light:'🕶', label:'隱私模式 · 不顯示位階',
+const VAL_PRIV = { level:'na', key:'demo', light:'🕶', label:'隱私模式 · 不顯示位階', method:'none',
   cls:'text-slate-400 bg-slate-600/15 border-slate-500/40', bands:null,
   note:'隱私模式開啟中，位階與目標價一併隱藏。再按一次 🕶 還原。' };
 /* 舊版：98 天前的快取資料 dataReal 回 true，燈號照亮、目標價照印、🐊 照判，
    而徽章只寫「⟳ 未更新（前次資料）」，1 天前和 1097 天前長得一模一樣。
    資料太舊跟資料是假的，對使用者的後果是一樣的，所以給它同一個規格的出口。 */
-const VAL_TOOOLD = { level:'na', key:'demo', light:'⏳', label:'資料太舊 · 不判定位階',
+const VAL_TOOOLD = { level:'na', key:'demo', light:'⏳', label:'資料太舊 · 不判定位階', method:'none',
   cls:'text-slate-400 bg-slate-600/15 border-slate-500/40', bands:null,
   note:`這批資料已經超過 30 天，或日期無法判讀。用舊資料算出來的位階沒有參考價值，請按「${LBL_REFRESH_W}」。` };
-const VAL_DEMO = { level:'na', key:'demo', light:'⚠', label:'示範值 · 不判定位階',
+const VAL_DEMO = { level:'na', key:'demo', light:'⚠', label:'示範值 · 不判定位階', method:'none',
   cls:'text-slate-400 bg-slate-700/25 border-slate-600/50 border-dashed',
   note:'目前這檔用的是程式內建的示範數字，不是真實股價與財報。用假數字算出來的「便宜／昂貴」會誤導判斷，因此系統不輸出位階結論。請輸入 FinMind Token 連線後再看。' };
+
+/* ── 估值方法的「出處」（provenance），全站唯一一份 ────────────────────
+   v93g。舊版 🐖 pig@val 的動物卡與 noteLine 都硬寫死「本益比」「跟它自己過去五年比」，
+   可是 valuate() 實際上有三把不同的尺：
+     ① 金融股 → 股價淨值比（PBR），完全不是本益比
+     ② basis='ind' → 本益比，但比的是同業中位數，不是它自己的歷史
+     ③ basis='conv' → 本益比，但比的是產業慣用區間，連同業資料都沒有
+   也就是說至少三種情況，畫面上那句話是錯的。這是 provenance drift：
+   文案先定案，後來判定邏輯長出新分支，文案沒跟上，而且沒有任何測試會抓到——
+   測試只驗「有沒有出現 🐖」，不驗「🐖 旁邊那句話講的是不是它真的用的那把尺」。
+   修法不是把那句話改對一次，而是讓那句話不可能手寫：
+   valuate() 每一條 return 都帶 method／basis，要講出處一律呼叫下面兩個函式。 */
+const VAL_METHOD_NAME = { pe:'本益比', pbr:'股價淨值比（PBR）' };
+const VAL_BASIS_NAME  = { self:'這檔自己過去的歷史', ind:'同產業中位數', conv:'產業慣用區間' };
+function valMethodName(v){ return (v && VAL_METHOD_NAME[v.method]) || null; }
+/* 回「本益比跟同產業中位數」這種完整片語。方法是 none／缺漏就回 null，
+   呼叫端必須自己決定整行不要印——不要印半句話，也不要退回猜一個預設值。 */
+function valMethodPhrase(v){
+  const m = valMethodName(v);
+  if(!m) return null;
+  return `${m}跟${VAL_BASIS_NAME[v.basis] || '本頁採用的判定基準'}`;
+}
 
 /* ══ HTML 跳脫：所有使用者可控或 API 可控的字串進入 innerHTML 前都必須經過這裡 ══ */
 function esc(v){
@@ -3530,10 +3567,31 @@ function perTrending(hist){
   const n = hist.length, step = Math.max(1, Math.floor(n/300));
   const vs = []; for(let i=0;i<n;i+=step) vs.push(hist[i]);
   const m = vs.length; if(m < 30) return false;
-  const idx = vs.map((x,i)=>[x,i]).sort((a,b)=>a[0]-b[0]);
-  const rv = new Array(m); idx.forEach(([,i],k)=>{ rv[i]=k+1; });
-  let d2 = 0; for(let k=0;k<m;k++){ const dd = (k+1) - rv[k]; d2 += dd*dd; }
-  const rho = 1 - (6*d2)/(m*(m*m-1));
+  /* v93f：ties（相同的本益比值）以前沒有做平均排名，直接按排序後的位置給 1,2,3…。
+     JavaScript 的 sort 是穩定的，所以一堆相同值會保留原本的時間順序，
+     人工給的 1,2,3… 就剛好跟時間 rank 完全一致 → rho = 1。
+     實測：一條**完全不動**的本益比序列（20,20,20,…）被判成「完美單調趨勢」。
+     那正好是最不該被判成 trending 的情況。
+
+     而且有 ties 時，d² 那條簡化公式本身就不成立，必須改用
+     「對 rank 做 Pearson 相關」的定義式。兩件事一起修。 */
+  const order = vs.map((x,i)=>[x,i]).sort((a,b)=>a[0]-b[0]);
+  const rv = new Array(m);
+  for(let k=0; k<m; ){
+    let j = k; while(j+1 < m && order[j+1][0] === order[k][0]) j++;
+    const avg = (k + j) / 2 + 1;              // 這一組相同值的平均排名
+    for(let q=k; q<=j; q++) rv[order[q][1]] = avg;
+    k = j + 1;
+  }
+  const tv = Array.from({length:m}, (_,i)=>i+1);   // 時間的 rank
+  const mean = a => a.reduce((x,y)=>x+y,0)/a.length;
+  const mv = mean(rv), mt = mean(tv);
+  let num=0, dv=0, dt=0;
+  for(let i=0;i<m;i++){ const a1=rv[i]-mv, b1=tv[i]-mt; num+=a1*b1; dv+=a1*a1; dt+=b1*b1; }
+  /* dv === 0 代表所有值都一樣（rank 全部相同），Spearman 沒有定義。
+     那是「完全沒有趨勢」，不是「完美趨勢」——回 false。 */
+  if(dv === 0 || dt === 0) return false;
+  const rho = num / Math.sqrt(dv * dt);
   return Math.abs(rho) > 0.70;
 }
 function epsDeclining(d){
@@ -3993,22 +4051,22 @@ function valuate(pe, d){
       /* v89：「第 78 百分位」對這一頁的使用者不成立。同一句話換成「過去五年裡有幾成的日子比現在便宜」，
          那是同一件事，但他讀得懂。技術名詞留在括號裡，要查得到出處。 */
       const note = `金融業看的是<strong>股價淨值比（PBR）</strong>，不是本益比。現在是 <strong>${fmt(pb,2)}</strong>——過去 ${(hb.n/250).toFixed(1)} 年裡，大約有 <strong>${pc}%</strong> 的日子比今天便宜（歷史區間 ${hb.lo}～${hb.hi}，術語：第 ${pc} 百分位）。請一併確認資本適足率與逾放比。`;
-      if(pb <= hb.cheap) return { level:'buy', key:'cheap', light:'🟢', label:'PBR 歷史低檔', cls:'text-emerald-300 bg-emerald-500/10 border-emerald-500/40', bands:hb, note };
-      if(pb <= hb.fair)  return { level:'hold', key:'fair', light:'🟡', label:'PBR 中位以下', cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:hb, note };
-      if(pb <= hb.rich)  return { level:'hold', key:'warm', light:'🟡', label:'PBR 中位以上', cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:hb, note };
-      return { level:'sell', key:'rich', light:'🔴', label:'PBR 歷史高檔', cls:'text-rose-300 bg-rose-500/10 border-rose-500/40', bands:hb, note };
+      if(pb <= hb.cheap) return { level:'buy', key:'cheap', light:'🟢', label:'PBR 歷史低檔', method:'pbr', basis:'self', cls:'text-emerald-300 bg-emerald-500/10 border-emerald-500/40', bands:hb, note };
+      if(pb <= hb.fair)  return { level:'hold', key:'fair', light:'🟡', label:'PBR 中位以下', method:'pbr', basis:'self', cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:hb, note };
+      if(pb <= hb.rich)  return { level:'hold', key:'warm', light:'🟡', label:'PBR 中位以上', method:'pbr', basis:'self', cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:hb, note };
+      return { level:'sell', key:'rich', light:'🔴', label:'PBR 歷史高檔', method:'pbr', basis:'self', cls:'text-rose-300 bg-rose-500/10 border-rose-500/40', bands:hb, note };
     }
     if(pe !== null && isFinite(pe) && pe > 0)
-      return { level:'na', key:'fin', light:'🏦', label:'金融業 · 待取得 PBR 歷史',
+      return { level:'na', key:'fin', light:'🏦', label:'金融業 · 待取得 PBR 歷史', method:'none',
                cls:'text-sky-300 bg-sky-500/10 border-sky-500/40',
                note:`金融業要用<strong>股價淨值比（PBR）</strong>判定，但目前還沒有足夠的 PBR 歷史（至少需要約一年）。請按「${LBL_REFRESH_W}」取得官方資料。本益比 ${fmt(pe,1)} 倍對金融股沒有參考價值——那是高槓桿與監理資本結構的結果，不代表便宜。` };
   }
   if(pe === null || !isFinite(pe) || pe <= 0)
-    return { level:'na', key:'na', light:'⚪', label:'資料不足', cls:'text-slate-400 bg-slate-700/30 border-slate-600/40',
+    return { level:'na', key:'na', light:'⚪', label:'資料不足', method:'none', cls:'text-slate-400 bg-slate-700/30 border-slate-600/40',
              note:'EPS 為負或缺漏，無法以本益比評估，請改看營收與現金流。' };
   /* 安全閘一：獲利劇烈波動 → 本益比不適用。 */
   if(epsVolatile(d))
-    return { level:'na', key:'trap', light:'⚠️', label:'獲利大幅波動 · 不判定位階',
+    return { level:'na', key:'trap', light:'⚠️', label:'獲利大幅波動 · 不判定位階', method:'none',
              cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:null,
              /* v93e-2：原文「而那通常是循環的末端」是對市場週期下結論，本頁沒有那個資料。
                 只講程式真的看到的事：分母在大幅變動，所以同一個股價會算出差很多的本益比。 */
@@ -4023,21 +4081,21 @@ function valuate(pe, d){
     ? `（過去五年裡大約有 <strong>${pctl}%</strong> 的日子比今天便宜；判定基準：${B.label}）`
     : `（判定基準：${B.label}）`;
   if(pe < B.cheap && epsDeclining(d))
-    return { level:'na', key:'trap', light:'⚠️', label:'本益比失真 · 不判定',
+    return { level:'na', key:'trap', light:'⚠️', label:'本益比失真 · 不判定', method:'none',
              cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:B,
              note:`本益比 ${fmt(pe,1)} 倍雖然低於便宜門檻 ${B.cheap}，但近四季的每股盈餘連續下降。<strong>低本益比可能只是過去比較高的獲利仍然留在分母裡</strong>，因此這次不把它解讀成便宜。` };
   if(pe < B.cheap)
-    return { level:'buy', key:'cheap', light:'🟢', label:'便宜區', cls:'text-emerald-300 bg-emerald-500/10 border-emerald-500/40', bands:B,
+    return { level:'buy', key:'cheap', light:'🟢', label:'便宜區', method:'pe', basis:B.basis, cls:'text-emerald-300 bg-emerald-500/10 border-emerald-500/40', bands:B,
              note:`本益比 ${fmt(pe,1)} 倍低於便宜門檻 ${B.cheap}，長線位階偏「便宜」，可分批建立部位。${basisNote}` };
   if(pe <= B.fair)
-    return { level:'hold', key:'fair', light:'🟡', label:'合理區（牛熊拉鋸）', cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:B,
+    return { level:'hold', key:'fair', light:'🟡', label:'合理區（牛熊拉鋸）', method:'pe', basis:B.basis, cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:B,
              note:`本益比 ${fmt(pe,1)} 倍落在 ${B.cheap}～${B.fair} 的「合理」區間，維持既有紀律，不追高不殺低。${basisNote}` };
   if(pe <= B.rich)
-    return { level:'hold', key:'warm', light:'🟡', label:'偏貴區（牛熊拉鋸）', cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:B,
+    return { level:'hold', key:'warm', light:'🟡', label:'偏貴區（牛熊拉鋸）', method:'pe', basis:B.basis, cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:B,
              /* v93d：原文「停止加碼並觀察獲利是否跟上」——前半是資金配置指示，
                 這一頁不知道你的狀況，沒有資格下。後半（看獲利跟不跟得上）才是這裡真的知道的事。 */
              note:`本益比 ${fmt(pe,1)} 倍落在 ${B.fair}～${B.rich}，位階轉偏貴。要判斷這個價格合不合理，看的是獲利有沒有跟上——不是價格本身。${basisNote}` };
-  return { level:'sell', key:'rich', light:'🔴', label:'昂貴區', cls:'text-rose-300 bg-rose-500/10 border-rose-500/40', bands:B,
+  return { level:'sell', key:'rich', light:'🔴', label:'昂貴區', method:'pe', basis:B.basis, cls:'text-rose-300 bg-rose-500/10 border-rose-500/40', bands:B,
            note:`本益比 ${fmt(pe,1)} 倍高於昂貴門檻 ${B.rich}，位階「昂貴」。<strong>這一頁不提供任何減碼比例或資金去處的建議。</strong>${basisNote}` };
 }
 
@@ -4151,8 +4209,19 @@ function showAnimalInfo(k, ctxId){
     const base = animalBase(k);
     if(['rhino','rhino_ind','turtle'].includes(base) && d.debt != null)
       facts.push(['這一檔的負債比', (d.debt*100).toFixed(1) + '%']);
-    if(base === 'pig' && animalWhy(k) === 'val' && d.pe != null)
-      facts.push(['這一檔現在的本益比', fmt(d.pe,1) + ' 倍']);
+    /* v93g：這裡原本無條件印出本益比那一列。金融股是用股價淨值比判定的，
+       印本益比等於在證據層擺一個跟結論無關的數字——比不印更糟。
+       改成問 valuate() 這一次到底用了哪一把尺，再印那一把尺的值與基準。 */
+    if(base === 'pig' && animalWhy(k) === 'val'){
+      const _v = valuate(d.pe, d), _ph = valMethodPhrase(_v);
+      const _pn = (_v.method === 'pbr') ? d.pbr : (_v.method === 'pe' ? d.pe : null);
+      if(_ph && _pn != null){
+        facts.push(['這一次用的尺', _ph]);
+        facts.push([valMethodName(_v) + '現在是', fmt(_pn, _v.method==='pbr'?2:1) + ' 倍']);
+        if(_v.bands && _v.bands.rich != null)
+          facts.push(['本頁的昂貴門檻', String(_v.bands.rich) + ' 倍']);
+      }
+    }
     if(['croc','horse'].includes(base) && d.pnl != null)
       facts.push(['這一筆的帳面損益', pct(d.pnl)]);
     if(['whale','shark'].includes(base) && d.holder != null)
@@ -5950,12 +6019,25 @@ function noteLine(s, d, animals, v, real){
   /* v85：🐖 豬與 🐢 烏龜有動物標籤，卻沒有對應的白話句——
      畫面上因此出現「🐖 豬　沒有。」：圖示成了唯一的資訊來源，
      而這份程式的設計原則正好相反（高齡使用者不會先看圖示）。 */
-  if(F.has('pig@val'))
-    rows.push([`本益比在這檔自己五年裡屬於偏高的位置${d.pe!=null?`（現在 ${fmt(d.pe,1)} 倍）`:''}`, 'text-rose-300 font-semibold']);
+  if(F.has('pig@val')){
+    /* v93g：舊版這一行把方法與基準寫死在字串裡（指名本益比、指名自身五年歷史）。
+       可是 valuate() 有三把尺：金融股用股價淨值比、basis='ind' 比的是同業中位數、
+       'conv' 比的是產業慣用區間——三種情況這句話都在說謊，
+       而且括號裡的數字也印錯（金融股明明用 PBR 判定，卻印本益比）。
+       方法、基準、數字現在一律由 valuate() 帶回來的 method／basis 決定；
+       方法是 none 就退到不指名任何一把尺，不要猜一個預設值。 */
+    const _ph = valMethodPhrase(v);
+    const _pn = (v && v.method === 'pbr') ? d.pbr : d.pe;
+    rows.push([_ph
+      ? `${_ph}比，落在偏高的位置${_pn!=null?`（目前 ${fmt(_pn, v.method==='pbr'?2:1)} 倍）`:''}`
+      : '長線估值落在偏高的位置', 'text-rose-300 font-semibold']);
+  }
   if(A.has('turtle') && d.debt != null)
     rows.push([`公司借的錢只佔資產 ${(d.debt*100).toFixed(1)}%，財務結構穩健`, 'text-emerald-300']);
   if(A.has('deadcat'))
-    rows.push(['年線下方的無量急拉，多半是反彈不是反轉', 'text-fuchsia-300']);
+    /* v93f：原文「多半是反彈不是反轉」跟這隻動物自己的 lim 直接打架
+       （lim 說「要看未來才知道，本頁確認不了」）。同一頁兩種說法，改成只講事實。 */
+    rows.push(['年線下方出現大漲，但成交量低於近 20 日平均；本頁無法判斷能不能延續', 'text-fuchsia-300']);
   if(!rows.length)
     return '<span class="text-slate-400 text-[13px]">目前這一檔沒有觸發任何提醒。</span>';
   const [first, cls] = rows[0];
@@ -6189,7 +6271,8 @@ function buildTargets(d){
        三個價位擺在一起互相矛盾，對不看線圖的人來說那看起來像「這檔貴了三倍該賣」。
 
        它們在數學上沒有錯（「本益比回到過去水準時的價格」），但那不是目標價，
-       而且沒有任何一句話講清楚這個差別。市場正在用完全不同的標準看這家公司。
+       而且沒有任何一句話講清楚這個差別。（這是程式註解：實際畫面上不替原因下結論——
+       程式只知道尺與價格脫鉤，不知道是成長、循環還是別的。）
 
        判定條件只用一條，而且是可以直接量的那一條：
          **現價離換算出來的區間太遠**（高於昂貴價 1.5 倍，或低於便宜價 0.67 倍）。
@@ -6791,8 +6874,16 @@ function targetPanelHTML(s){
         ${d.rtStale ? `<div class="rounded-lg border border-cyan-500/40 bg-cyan-500/10 text-cyan-200 p-2 mb-2 text-[11px] leading-relaxed">
           ⚡ <strong>價格為即時報價，但下方的均線與布林通道仍以前一交易日收盤計算</strong>，未含今日盤中波動。
           盤中劇烈波動時，短期通道的寬度會被低估（實測漲停時可低估約 44%），請以長期估值為主要判斷依據。</div>` : ''}
-      <div class="text-[11px] text-slate-400 flex items-center gap-2 flex-wrap">🏛️ 長期目標價 · 本益比估值法（近 4 季累積 EPS ${d.eps?fmt(d.eps,2):'—'} 元${
-        d.epsAmbiguous ? '<span class="tag border border-amber-500/50 bg-amber-500/15 text-amber-200 ml-1">⚠ 口徑未確認</span>' : ''}）${srcBadge(d)}</div>
+      <div class="text-[11px] text-slate-400 flex items-center gap-2 flex-wrap">${
+        /* v93g：這一行原本無條件寫「本益比估值法」。金融股的長線位階是用股價淨值比判的，
+           而下面隔一段的說明自己就寫著「兩種尺不能混用」——標題與正文相隔一行互相打臉。
+           實測：金融保險業 ＋ 完整 PBR 歷史，標題照樣寫本益比估值法，還附一個跟結論無關的 EPS。
+           講不出方法的時候寧可不指名，也不要指名一把它其實沒在用的尺。 */
+        (t.longBlocked === 'finPBR' || t.longBlocked === 'finNoPBR')
+        ? `🏛️ 長期估值 · 這一檔不是用本益比判定`
+        : `🏛️ 長期目標價 · 本益比估值法（近 4 季累積 EPS ${d.eps?fmt(d.eps,2):'—'} 元${
+            d.epsAmbiguous ? '<span class="tag border border-amber-500/50 bg-amber-500/15 text-amber-200 ml-1">⚠ 口徑未確認</span>' : ''}）`
+      }${srcBadge(d)}</div>
         ${d.epsAmbiguous && d.epsAlt ? `<div class="mt-1 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-[12px] text-amber-100 leading-relaxed">
           官方沒有公布這一檔的本益比，所以無法確認財報給的是<strong>單季</strong>還是<strong>累計</strong>。兩種讀法都算得出一個答案：<br>
           <span class="tabular-nums">・四季相加：<strong>${fmt(d.epsAlt.bySum,2)}</strong> 元　・累計制換算：<strong>${fmt(d.epsAlt.byYtd,2)}</strong> 元</span><br>
@@ -6824,7 +6915,10 @@ function targetPanelHTML(s){
         跟現在的 <strong>${fmt(d.price,1)}</strong> 元差太遠。<br><br>
         那三個數字的意思是<strong>「如果本益比回到過去的水準，價格會是多少」</strong>——
         <strong>不是目標價，也不代表這檔貴了幾倍</strong>。
-        市場正在用完全不同的標準看這家公司（常見於獲利大幅成長、或產業循環轉折）。<br>
+        <!-- v93f：原文「市場正在用完全不同的標準看這家公司（常見於獲利大幅成長、或產業循環轉折）」
+             ——那是在替原因下結論。程式真正知道的只有「歷史尺與現價嚴重脫鉤」，
+             至於是成長、循環、資料異常、公司結構改變還是市場錯價，它一項都分不出來。 -->
+        <strong>這一頁只能確認「歷史本益比換算出來的價位與目前價格嚴重脫鉤」，無法從這些資料判斷原因。</strong><br>
         <strong>這個模型對這一檔目前失效，所以不列出價位。</strong>下面的季線與布林通道是純技術指標，不含估值判斷。
       </div>
       <div class="text-[10px] text-slate-500 mt-1">倍數基準：${esc(bnd.label)}</div>
