@@ -1498,7 +1498,10 @@
     <details class="secfold" data-sec="問自己三個問題">
     <summary class="secsum"><span class="sec-bar"></span><span class="sectitle">問自己三個問題</span><span class="foldmore"></span></summary>
     <div class="secbody">
-    <p class="text-[13px] text-slate-400 mb-3">報酬的最大殺手不是市場，是自己。誠實作答，系統會叫出對應的動物。</p>
+    <!-- v93e：原文「報酬的最大殺手不是市場，是自己」——那是一句沒有來源的最大化主張，
+         而這一頁在第四層已經誠實承認「本頁自己訂的、沒有回測」。小字誠實救不了大字過度宣稱。
+         改成只講這三題實際在做的事。 -->
+    <p class="text-[13px] text-slate-400 mb-3">這三題用來檢查幾種常見的情況：原本設好的規則，容易在什麼時候被當下的情緒取代。誠實作答，系統會叫出對應的動物。</p>
     <div id="quizGrid" class="grid grid-cols-1 md:grid-cols-3 gap-3"></div>
     <div id="quizSummary" class="hidden mt-3 rounded-xl p-3 text-xs border border-slate-700/40 bg-slate-900/60 leading-relaxed"></div>
     </div>
@@ -1841,7 +1844,9 @@ const ANIMAL_META = [
        屬於第三層。留在動物卡上，使用者會停在第一層不再往下看，而第一層沒有價格可以搭配。 */
     can:'<strong>不要只因為市場低迷就買，也不要只因為低迷就停手</strong>——這一層看不到任何一檔的價格。想長期投資的話，往下看你想買的那一檔自己的「便宜參考價」，那裡才會告訴你現在算不算便宜、以及可以怎麼做。如果你本來就有固定扣款的習慣，這裡沒有出現要你停下來的理由。',
     tr:'加權指數收盤價 &lt; 240 日均線（俗稱年線）。',
-    lim:'年線不知道為什麼跌，也不知道會跌多久。歷史上長期報酬較好的位置是「平均」，而你只會經歷「一次」。' },
+    /* v93e：原文「歷史上長期報酬較好的位置是『平均』」——那是統計宣稱，本頁沒有驗證過。
+       要講的其實是「平均會發生在很多次，而你只會經歷一次」這個機制，那不需要引用任何研究。 */
+    lim:'年線不知道為什麼跌，也不知道會跌多久。<strong>本頁沒有驗證過這個位置之後的報酬。</strong>而且就算有一個平均值，平均是很多次的結果，你只會經歷一次。' },
   { k:'deadcat', e:'🐱', n:'死貓', src:'market', ev:'obs',
     ttl:'貓在跳｜跌深後的一根急拉，但沒什麼人在買',
     st:'市場還在年線下方，今天卻突然大漲，可是成交量比平常少很多。',
@@ -1858,7 +1863,11 @@ const ANIMAL_META = [
   { k:'whale', e:'🐋', n:'鯨魚', src:'market', ev:'none', pair:'shark',
     ttl:'大戶在買｜持股很多的人，最近兩週在加碼',
     st:'持有一千張以上的大股東，持股比例連續兩週增加。',
-    you:'大戶的錢多、資訊通常也比較多，所以值得留意。<strong>但這不是買進保證</strong>——他們可能看的期間跟你完全不同，而且這裡只要增加 0.01% 就算，隨機情況下每四檔就有一檔會符合。',
+    /* v93e：原文「大戶的錢多、資訊通常也比較多」——這份資料只知道持股比例的變化，
+       不知道對方有沒有資訊優勢。那是推測，不是這裡看得到的事。
+       「隨機下每四檔就有一檔」也補上出生證明：那是把每週增／減簡化成各半且互相獨立
+       算出來的 0.5×0.5，是理論示例，不是市場實證。 */
+    you:'這代表<strong>大額持股者的持股比例連續兩週增加</strong>——原因是什麼、之後會怎麼走，本頁不知道。<strong>這不是買進保證。</strong>而且這裡只要增加 0.01% 就算：如果把每週的增／減簡化成各半、而且兩週互相獨立，光靠隨機就有 25% 的機會連兩週增加。',
     can:'當成<strong>加分觀察</strong>，不要只看到鯨魚就買。可以去看一下這兩週這家公司有沒有發生什麼事；價格划不划算，還是要看下面那一檔自己的參考價。',
     obs:true,
     tr:'千張大戶持股比<strong>連續兩週增加</strong>。與 🦈 鯊魚完全對稱、互斥。',
@@ -1899,7 +1908,9 @@ const ANIMAL_META = [
   { k:'rhino', e:'🦏', n:'灰犀牛', src:'market', ev:'none', pair:'turtle',
     ttl:'借太多｜這家公司的負債偏高',
     st:'公司借的錢佔它全部資產超過八成。',
-    you:'借得多的公司，生意好的時候看不出問題，一旦利率上升或訂單變少，通常是最先出事的那一批。<strong>這不代表它快倒了</strong>，只是一個看得見卻常被忽略的風險。',
+    /* v93e：原文「通常是最先出事的那一批」是排序式的實證主張，本頁沒有那個資料。
+       改成講機制——那才是這個數字真的能說明的事。 */
+    you:'借得多，代表<strong>利息與還款壓力對利率變化、現金流變化更敏感</strong>。生意好的時候看不出來，利率一升或訂單一少，壓力會先反映在這裡。<strong>這不代表它快倒了</strong>，只是一個看得見卻常被忽略的風險。',
     can:'買之前多查一下<strong>錢是借去做什麼的</strong>——某些產業本來就需要較高的負債。再跟同一行的其他公司比一次，並看流動比與利息保障倍數。',
     tr:'負債比 &gt; <strong>80%</strong>（金融、保險、銀行、證券、租賃業已排除，它們的負債比天生就是 85～95%）。',
     lim:'負債比高不等於快倒了。景氣好時沒事，利率一升或需求一縮就先出事。' },
@@ -3999,9 +4010,12 @@ function valuate(pe, d){
   if(epsVolatile(d))
     return { level:'na', key:'trap', light:'⚠️', label:'獲利大幅波動 · 不判定位階',
              cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:null,
-             note:`這檔近幾季的獲利變動幅度過大（景氣循環股、剛轉盈或剛轉虧的公司常見）。<br>
-                   <strong>本益比對這種公司會給出完全相反的訊號</strong>：獲利在頂點時本益比最低（看起來最便宜），
-                   而那通常是循環的末端。<br>系統因此不對這檔判定位階，請改看營收年增率與產業景氣。` };
+             /* v93e-2：原文「而那通常是循環的末端」是對市場週期下結論，本頁沒有那個資料。
+                只講程式真的看到的事：分母在大幅變動，所以同一個股價會算出差很多的本益比。 */
+             note:`這檔近四季的獲利變動幅度，超過本頁設定的穩定度門檻。<br>
+                   本益比的分母（每股盈餘）正在大幅變動，<strong>同一個股價會算出差很多的本益比</strong>——
+                   獲利在高點時本益比看起來最低，獲利一掉下來同一個價格就變得很貴。<br>
+                   所以這次<strong>不把本益比當成可靠的長線尺</strong>，請改看營收年增率與獲利本身的變化。` };
   /* 安全閘二：低本益比 + 獲利連續下滑 = 典型的低本益比陷阱。 */
   const B = peBands(ind, d);
   const pctl = (B.basis === 'self') ? histPct(d.perHist, pe) : null;
@@ -4011,7 +4025,7 @@ function valuate(pe, d){
   if(pe < B.cheap && epsDeclining(d))
     return { level:'na', key:'trap', light:'⚠️', label:'本益比失真 · 不判定',
              cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:B,
-             note:`本益比 ${fmt(pe,1)} 倍雖然低於便宜門檻 ${B.cheap}，但近 4 季 EPS 逐季下滑。這時候的低本益比來自「過去的獲利」，不代表便宜——景氣循環股在獲利高峰最容易出現這個陷阱。系統因此不判定為便宜區，請改看營收年增率與毛利率趨勢。${basisNote}` };
+             note:`本益比 ${fmt(pe,1)} 倍雖然低於便宜門檻 ${B.cheap}，但近四季的每股盈餘連續下降。<strong>低本益比可能只是過去比較高的獲利仍然留在分母裡</strong>，因此這次不把它解讀成便宜。` };
   if(pe < B.cheap)
     return { level:'buy', key:'cheap', light:'🟢', label:'便宜區', cls:'text-emerald-300 bg-emerald-500/10 border-emerald-500/40', bands:B,
              note:`本益比 ${fmt(pe,1)} 倍低於便宜門檻 ${B.cheap}，長線位階偏「便宜」，可分批建立部位。${basisNote}` };
@@ -5104,7 +5118,14 @@ function techFrom(closes){
   out.ma20 = closes.length >= 20 ? +mean(t20).toFixed(2) : null;
   if(closes.length >= 20){
     const m = mean(t20);
-    const variance = t20.reduce((a,b)=>a+Math.pow(b-m,2),0) / (t20.length-1);
+    /* v93e-2：這裡原本除以 (n−1)，也就是**樣本標準差**。
+       但第四層現在引用 John Bollinger 對自己方法的說明，而他的預設算法用的是
+       **母體標準差**（除以 n）——20 天就是全部的資料，不是從母體抽出來的樣本。
+       既然引用作者，公式就不能偷偷換成另一個版本，否則「依據：作者官方規則」那句話
+       只對了一半。改成除以 n。
+       影響：σ 略微變小（20 筆時約小 2.6%），上下軌因此稍微窄一點。
+       這是修正，不是調參——原本那條就不是 Bollinger 的預設。 */
+    const variance = t20.reduce((a,b)=>a+Math.pow(b-m,2),0) / t20.length;
     out.sd20 = +Math.sqrt(variance).toFixed(2);
     // σ=0 代表停牌或連續鎖死，此時通道無意義，不得產生「超賣」訊號
     if(out.sd20 > 0){
@@ -6121,7 +6142,32 @@ function buildTargets(d){
      而同一檔的三維度目標價卻整區空白。同一份資料、兩套門檻、兩個互相矛盾的答案。
      KY 股與金控子公司抓不到 EPS 是常態，所以這不是邊角情況。 */
   const _pbc0 = perBaseClose(d);
-  if((d.eps && d.eps > 0) || (d.per > 0 && _pbc0 > 0)){
+  /* v93e-2：金融股的位階是用**股價淨值比（PBR）**判定的（見 valuate()），
+     但這裡以前無條件用 PE bands × EPS 生出長線便宜／合理／昂貴價。
+     結果同一檔股票會出現「位階看 PBR、目標價看 PE」——兩種估值方法混在一起。
+     而 tacticFor() 的註解還以為金融股都被前面的 V 卡攔掉了；實際上只有
+     「**沒有** PBR 歷史」的金融股會拿到 fin 這個 key，有 PBR 歷史的會一路走下去。
+
+     在沒有可靠的「每股淨值 → 價格」換算之前，正確的做法是不輸出：
+     寧可少一組數字，也不要把 PE 算出來的價位掛在一檔用 PBR 判位階的股票上。 */
+  /* 條件是「是不是金融業」，**不是**「有沒有 PBR 歷史」。
+     第一版我寫成後者，結果「金融股但還沒抓到 PBR 歷史」那一種照樣拿到
+     PE 算出來的便宜／合理／昂貴價——那正是最不該給的情況：
+     連判位階的尺都還沒有，卻先給了三個具體價位。 */
+  const _fin = isFinancial(d.ind, d.id);
+  if(_fin){
+    const _hasPBR = !!histBands(d.pbrHist);
+    t.longOk = false;
+    t.longBlocked = _hasPBR ? 'finPBR' : 'finNoPBR';
+    t.longBlockWhy = _hasPBR
+      ? '這是金融業，本頁的長線位階是用<strong>股價淨值比（PBR）</strong>判定的，'
+        + '而下面這三個價位的算法是「本益比 × 每股盈餘」——<strong>兩種尺不能混用</strong>。'
+        + '在本頁做出可靠的「每股淨值 → 價格」換算之前，不輸出金融股的長線目標價。'
+      : '這是金融業，要用<strong>股價淨值比（PBR）</strong>判定，但目前還沒有足夠的 PBR 歷史。'
+        + '本益比對金融股沒有參考價值——那是高槓桿與監理資本結構的結果，不代表便宜。'
+        + `請按「${LBL_REFRESH_W}」取得官方資料。`;
+    t.longBlockWhy += '<br>中期（季線）與短期（布林通道）是純價格指標，不受影響，照常顯示。';
+  } else if((d.eps && d.eps > 0) || (d.per > 0 && _pbc0 > 0)){
     t.longOk = true;
     const B = peBands(d.ind, d);
     t.bands = B;
@@ -6188,6 +6234,34 @@ function buildTargets(d){
 
    gist 的寫法遵守跟 ANIMAL_META.can 同一條界線：可以寫「先確認什麼」，
    不寫「該買該賣多少」。 */
+/* ══════════════════════════════════════════════════════════════
+   第四層：這一頁**唯一**引用的外部依據（v93e）
+
+   產品哲學（決定於 v93e）：
+     絕大多數的實證主張直接改寫成「機制」——講清楚這件事為什麼會影響你，
+     而不是宣稱一個沒有來源的統計結果（「最大殺手」「最傷報酬」「後續報酬較差」）。
+   例外只留給同時滿足兩個條件的：
+     ① 它是**原始提出者對自己方法的定義或校正**，不是第三方的實證排名；
+     ② 這一頁的數字**不依賴**它成立——引用只是幫使用者理解，拿掉也不會讓算式失效。
+   這兩條之外的，一律不引用、改寫成機制。
+
+   為什麼要留這幾條而不是全部改寫：使用者確實會問「±2σ 不是 95% 嗎」，
+   而答案剛好來自方法的作者本人。把出處放在第四層，比含糊帶過誠實。 */
+const SOURCES = {
+  bollinger: {
+    who:'John Bollinger（布林通道的提出者）',
+    what:'官方規則明寫：預設參數（20 日 ±2 標準差）在實務上通常約 <strong>90%</strong> 的資料落在通道內，'
+       + '而不是常態分配直覺的 95%。',
+    where:'bollingerbands.com — Bollinger Band Rules',
+    why:'本頁用的就是他的預設參數，所以直接採用作者自己的校正說法。' },
+  bengen: {
+    who:'William P. Bengen（1994）',
+    what:'「4% 法則」的原始方法是：第一年提領 4%，之後依<strong>實際通膨</strong>調整——'
+       + '<strong>不是</strong>每年固定加一個百分比。',
+    where:'Bengen, W. P. (1994), Determining Withdrawal Rates Using Historical Data',
+    why:'黑天鵝情境用固定 2% 只是為了讓教學情境可重現，跟原始方法不同，必須講清楚差在哪。' },
+};
+
 const TACTIC_META = {
   A: { icon:'📐', cond:'長線便宜 <strong>且</strong> 短線超賣',
        title:bcp => `兩項同時成立：估值在${bcp.zone} ＋ 短線跌破通道下軌`,
@@ -6273,7 +6347,10 @@ function tacticFor(s){
   /* 閘門：燈號已經判定「本益比失真」或「金融業待取得 PBR」時，
      這裡不得再輸出任何帶價位的加碼／減碼指示。
      舊版只擋住標籤，沒擋住行動指示——畫面上最像指令的那一塊反而是唯一沒接閘門的。 */
-  if(V.key === 'trap' || V.key === 'fin'){
+  /* v93e-2：原本只擋 'fin'（金融業但**沒有** PBR 歷史）。有 PBR 歷史的金融股
+     位階是用 PBR 判的，卻會一路走到下面用 PE 產生的價位去下策略結論。
+     金融股一律不讓 PE 參與第三層。 */
+  if(V.key === 'trap' || V.key === 'fin' || isFinancial(d.ind, s.id)){
     return { key:'V', tone:'amber', icon:V.light, title:`${V.label} — 不輸出調倉動作`,
       body:`${V.note}<br><br>系統<strong>不會</strong>在這個狀態下給你加碼或減碼的價位——
             用一個已知失真的估值去算出來的買賣區間，看起來很具體，卻沒有參考價值。
@@ -6284,18 +6361,6 @@ function tacticFor(s){
          它們只用收盤價算，不受估值失真影響，而表格那邊本來就照實印。 */
       moves: null, longSt:'na', midSt:midSt0, shortSt:shortSt0, aboveYear:aboveYear0, whale:false, muted:true };
   }
-  let longSt = 'na';
-  if(V.level === 'buy')       longSt = 'cheap';
-  else if(V.level === 'sell') longSt = 'rich';
-  /* 舊版這裡寫死 16，直接推翻上面 valuate 的三層判定，
-     還會印出「本益比 35.0 倍位於 16～20 倍的偏貴區間」這種數字本身就是假的句子。 */
-  else if(V.level === 'hold'){
-    /* V.bands 對金融股是 PBR 分位，拿去比 PE 會印出「本益比 12.0 倍位於 1.2～1.5 倍的偏貴區間」。
-       金融股在上面已經被 V 卡閘門攔下，這裡只處理非金融。 */
-    const BB = peBands(d.ind, d);
-    longSt = (d.pe != null && BB && d.pe > BB.fair) ? 'warm' : 'fair';
-  }
-  const midSt = midSt0, shortSt = shortSt0, aboveYear = aboveYear0;
   /* v93e：**產生數字的 basis，就是解釋數字的 basis。**
      t.cheap / t.fair / t.rich 是 buildTargets() 用 t.bands 那一次算出來的；
      策略卡的文案如果再呼叫一次 peBands()，等於「希望第二次算出同一個答案」。
@@ -6304,6 +6369,22 @@ function tacticFor(s){
      看起來拿到了，其實是另一次計算的結果。這裡抓住那一次，往下全部沿用。 */
   const BND = t.bands || (V && V.bands) || peBands(d.ind, d);
   const BCP = peCopy(BND);
+  let longSt = 'na';
+  if(V.level === 'buy')       longSt = 'cheap';
+  else if(V.level === 'sell') longSt = 'rich';
+  /* 舊版這裡寫死 16，直接推翻上面 valuate 的三層判定，
+     還會印出「本益比 35.0 倍位於 16～20 倍的偏貴區間」這種數字本身就是假的句子。 */
+  else if(V.level === 'hold'){
+    /* V.bands 對金融股是 PBR 分位，拿去比 PE 會印出「本益比 12.0 倍位於 1.2～1.5 倍的偏貴區間」。
+       金融股在上面已經被 V 卡閘門攔下，這裡只處理非金融。 */
+    /* v93e-2：這裡原本又呼叫一次 peBands()——跟 A/F 卡剛修掉的是同一類問題：
+       「希望第二次算出跟第一次一樣的答案」。而 peBands() 不是純函式，
+       它的同業 fallback 會讀當下的 watchlist。契約是：
+       **產生數字的 basis，就是解釋數字、判斷狀態的 basis。**
+       所以 BND 提前決定（見下面），這裡直接用它。 */
+    longSt = (d.pe != null && BND && d.pe > BND.fair) ? 'warm' : 'fair';
+  }
+  const midSt = midSt0, shortSt = shortSt0, aboveYear = aboveYear0;
   const whale = d.holder > 0 && d.holderPrev > 0;
 
   // ── 策略判定（依優先序）──
@@ -6720,7 +6801,14 @@ function targetPanelHTML(s){
         ${d.epsQuarters && d.epsQuarters.length ? `<div class="text-[10px] text-slate-500 mt-0.5">財報期別：${esc(d.epsQuarters[0])} ～ ${esc(d.epsQuarters[d.epsQuarters.length-1])}（共 ${d.epsQuarters.length} 季）</div>` : ''}
         ${d.epsNote ? `<div class="text-[10px] text-amber-400/90 mt-1 leading-relaxed">⚠ ${safeText(d.epsNote,200)}</div>` : ''}
       </div>
-      ${t.longBroken ? `
+      ${(t.longBlocked === 'finPBR' || t.longBlocked === 'finNoPBR') ? `
+      <!-- v93e-2：金融股用 PBR 判位階，PE 目標價不輸出。必須說出為什麼，
+           不能安靜地少一塊——那會讓使用者以為是資料還沒抓到。 -->
+      <div class="rounded-xl border-2 border-sky-500/50 bg-sky-500/10 text-sky-100 p-3 text-[14px] leading-relaxed">
+        <div class="font-bold text-[15px] mb-1.5">🏦 這一檔不列長線目標價</div>
+        ${t.longBlockWhy}
+      </div>
+      ` : t.longBroken ? `
       <!-- v72：分位模型對這一檔已經脫鉤，不列價位。理由寫在 buildTargets 的註解裡。 -->
       <div class="rounded-xl border-2 border-amber-500/60 bg-amber-500/10 text-amber-100 p-3 text-[14px] leading-relaxed">
         <div class="font-bold text-[15px] mb-1.5">⚠ 這一檔算不出有意義的長期價位</div>
@@ -7077,7 +7165,7 @@ async function loadMarket(){
   } else if(last < ma && bias < -10){
     sec.classList.add('glow-green');
     box.className = 'rounded-lg p-3 text-xs leading-relaxed border border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
-    box.innerHTML = `<div class="font-bold mb-1">🐻➜🐂 大盤比一年的平均低很多（相對便宜的位置）</div>大盤現在比「最近一年的平均點數」低了 ${fmt(Math.abs(bias))}%（術語：負乖離），接近歷史相對低檔區。大盤區只描述<strong>市場位置</strong>；具體的價格與調倉建議在下方「三維度目標價」與調倉區間，那裡才會給數字。歷史統計說這種位置的長期報酬較好，但那是「平均」，而你只會經歷「一次」，沒有人知道低點在哪裡。<span class="text-amber-200">另外，−10% 這條線是本頁自己訂的，沒有回測。</span><br><strong class="text-amber-200">如果你正在考慮動用生活費或解約定存，請先跟家人談過。</strong>`;
+    box.innerHTML = `<div class="font-bold mb-1">🐻➜🐂 大盤比一年的平均低很多（相對便宜的位置）</div>大盤現在比「最近一年的平均點數」低了 ${fmt(Math.abs(bias))}%（術語：負乖離），接近歷史相對低檔區。大盤區只描述<strong>市場位置</strong>；具體的價格與調倉建議在下方「三維度目標價」與調倉區間，那裡才會給數字。<span class="text-amber-200">−10% 這條線是本頁自己訂的，而且<strong>本頁沒有驗證過這個位置之後的報酬</strong>——所以這裡只說位置，不說「之後會怎樣」。</span><br><strong class="text-amber-200">如果你正在考慮動用生活費或解約定存，請先跟家人談過。</strong>`;
   } else if(last > ma && bias > 15){
     sec.classList.add('glow-red');
     box.className = 'rounded-lg p-3 text-xs leading-relaxed border border-rose-500/40 bg-rose-500/10 text-rose-200';
@@ -7085,7 +7173,7 @@ async function loadMarket(){
        名字是策略層，內文是狀態層，同一個方塊自己打自己。這一頁只做狀態層，
        所以名字改成描述位置、不描述動作。內文一個字都沒有變弱。
        （−10% 那一格的標題 v92 已經改過了，這裡把 +15% 這一格補齊。） */
-    box.innerHTML = `<div class="font-bold mb-1">⚠️ 大盤比一年的平均高很多</div>大盤現在比「最近一年的平均點數」高了 ${fmt(bias)}%（術語：正乖離），超過 15%。歷史上這個位置的後續報酬較差。<span class="text-amber-200">+15% 這條線是本頁自己訂的，沒有回測。</span><strong>大盤區只描述市場位置；價格與調倉建議在下方「三維度目標價」與調倉區間。</strong>`;
+    box.innerHTML = `<div class="font-bold mb-1">⚠️ 大盤比一年的平均高很多</div>大盤現在比「最近一年的平均點數」高了 ${fmt(bias)}%（術語：正乖離），超過 15%。<span class="text-amber-200">+15% 這條線是本頁自己訂的，而且<strong>本頁沒有驗證過這個位置之後的報酬</strong>。</span><strong>大盤區只描述市場位置；價格與調倉建議在下方「三維度目標價」與調倉區間。</strong>`;
   } else {
     box.className = 'rounded-lg p-3 text-xs leading-relaxed border border-slate-700/40 bg-slate-900/60 text-slate-300';
     box.innerHTML = `<div class="font-bold mb-1 text-slate-200">📊 大盤在一年平均的附近</div>大盤與「最近一年的平均點數」相差 ${pct(bias)}，落在 −10% ～ +15% 之間。這一段<strong>沒有出現任何位階訊號</strong>。個別股票的價格在哪一格，仍然要看下方「三維度目標價」。<span class="text-slate-400">如果你原本就有固定的投入節奏，這裡沒有出現任何要你改變它的理由。</span>`;
@@ -7820,8 +7908,11 @@ function renderMyPnl(){
        ${fakeWin ? `<div class="mt-2 text-[13px] text-rose-200 rounded-lg border border-rose-500/40 bg-rose-500/10 p-2.5">⚠ 其中 <strong>${fakeWin}</strong> 檔扣掉手續費與證交稅之後<strong>其實是賠錢的</strong>（門檻是逐檔算的：一般股票約 0.6%、ETF 約 0.4%、債券 ETF 約 0.3%）。</div>` : ''}
        ${oddLot ? `<div class="mt-2 text-[12px] text-amber-300">⚠ 你有零股部位。多數券商每筆最低手續費 20 元，小額零股的來回成本可能超過 3%——上面的數字<strong>已經照這個下限算</strong>了，所以看起來會比 0.1425% 高，那是對的。</div>` : ''}
        <div class="mt-2 text-[13px] text-slate-300 rounded-lg border border-slate-600/50 bg-slate-900/50 p-2.5">
-         另一邊的事：這些股票<strong>不賣</strong>的話會繼續配息。本頁沒有記錄你已經領到多少股息，
-         但那通常是存股族長期報酬的一大半——賣掉之後就沒有了。
+         <!-- v93e：原文「那通常是存股族長期報酬的一大半」——「存股族」沒有定義，
+              「一大半」也沒有來源（各家長期資料的股息貢獻比例差距很大）。
+              改成只講這一頁真的知道的事：股息是總報酬的一部分，而本頁沒有記錄它。 -->
+         另一邊的事：這些股票<strong>不賣</strong>的話會繼續配息。股息也是總報酬的一部分，
+         而<strong>本頁沒有記錄你已經領到多少股息</strong>——所以上面那個帳面損益不是完整的總報酬。
        </div>
        </div>
      </details>` +
@@ -7991,7 +8082,11 @@ function runBlackSwan(){
   if(mv <= 0){ mv = 3000000; assumed = true; }
 
   const draw = state.swanMode === 'draw';
-  const INFL = 0.02;   // 4% rule 的原始定義是「實質固定」，也就是提領金額每年要跟著物價漲
+  /* v93e 更正：這裡的 2% 是**本頁的模型假設**，不是 4% rule 的原始定義。
+     Bengen 的原始方法是「第一年提領 4%，之後依**實際通膨（CPI）**調整」——
+     是跟著真實物價走，不是每年固定加 2%。固定 2% 只是為了讓這個教學情境可重現
+     （這一頁的所有情境參數都是固定常數，才會不論誰按下去都得到同一個結論）。 */
+  const INFL = 0.02;   // 本頁固定用 2% 當物價調整率（模型假設，見上）
   /* 退休族每年是「提領」不是「投入」。舊版把 addPerYear 寫死成 +10%，
      於是不論誰按下去都會得到「第 4 年回本」——而那筆錢有一半以上是使用者自己再投進去的。
      對正在提領的人來說，同樣一次 −50% 會演變成完全相反的結論。 */
@@ -8063,11 +8158,11 @@ function runBlackSwan(){
        <div class="bg-slate-800/60 rounded p-2"><div class="text-[11px] text-slate-400">第 20 年${draw?'（不提領）':'（不扣款）'}</div><div class="text-sm font-bold text-slate-300">NT$ ${SENS(moneyRough(hold[YEARS]))}</div></div>
      </div>` +
     (draw
-      ? `<div class="mt-2 text-[13px] text-amber-100 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 leading-relaxed">關鍵結論（退休族版本）：<strong class="text-rose-300">崩盤後還要按原金額提領，等於在最低點被迫賣股</strong>——這叫「報酬順序風險」，它跟你選什麼股票無關。${ruinYear?`本情境在<strong class="text-rose-300">第 ${ruinYear} 年資產歸零</strong>。`:(recoverYear>0?`本情境約第 ${recoverYear} 年回到原始市值。`:`本情境 20 年內未回到原始市值。`)}<br>實務上常見的做法是<strong>準備 2～3 年的生活費現金</strong>，崩盤那幾年靠現金過日子、不動股票。這一頁不會告訴你該準備多少，那要看你的實際開銷。</div>`
-      : `<div class="mt-2 text-slate-400">關鍵結論：崩盤真正的傷害不是帳面數字，而是<strong class="text-rose-300">在低點停止投入或認賠出場</strong>。只要現金流不斷、持股體質健康，時間會把黑天鵝變成一次超額報酬的補貨機會。</div>`) +
+      ? `<div class="mt-2 text-[13px] text-amber-100 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 leading-relaxed">關鍵結論（退休族版本）：<strong class="text-rose-300">崩盤後還要按原金額提領，等於在最低點被迫賣股</strong>——這叫「<strong>報酬順序風險</strong>」：即使二十年的總報酬相近，壞的那幾年如果集中在<strong>提領期的一開始</strong>，提領會把傷害放大。${ruinYear?`本情境在<strong class="text-rose-300">第 ${ruinYear} 年資產歸零</strong>。`:(recoverYear>0?`本情境約第 ${recoverYear} 年回到原始市值。`:`本情境 20 年內未回到原始市值。`)}<br>常見的做法之一，是另外保留一段時間可動用的低風險資產，讓崩盤那幾年不必被迫賣股票。<strong>要保留多久取決於你的支出、其他收入與資產配置</strong>——這一頁不知道那些，也不會給你一個數字。</div>`
+      : `<div class="mt-2 text-slate-400">關鍵結論：崩盤真正的傷害不是帳面數字，而是<strong class="text-rose-300">在低點停止投入或認賠出場</strong>。在這個<strong>固定會復原</strong>的模型假設下，持續投入會在低價買到更多單位——但那是這個模型的設定，<strong class="text-amber-300">真實市場不保證復原</strong>，單一公司更可能是永久性的損失。</div>`) +
     `<div class="mt-2 pt-2 border-t border-white/10 text-[11px] text-slate-400 leading-relaxed">
        <strong>完整假設（全部揭露）：</strong>年化成長 7%；${draw?'':'崩跌後第 1～4 年額外加計 3%（模擬「在便宜價買到」的修復效果，故此期間為 10%）；'}
-       ${draw?'每年提領金額設定為起始市值的 4%，並依 4% rule 的原始定義每年隨物價調升 2%，不隨市值縮減。':'每年投入金額設定為起始市值的 10%。'}以上皆為教學用的情境假設，<strong class="text-amber-300">非報酬預測、非未來保證</strong>。<br>
+       ${draw?'每年提領金額設定為起始市值的 4%，之後每年<strong>固定</strong>調升 2%、不隨市值縮減。<span class="text-amber-300">注意：4% rule 的原始方法（Bengen, 1994）是依<strong>實際通膨</strong>調整，不是固定 2%；這裡用固定值只是為了讓情境可重現。</span>':'每年投入金額設定為起始市值的 10%。'}以上皆為教學用的情境假設，<strong class="text-amber-300">非報酬預測、非未來保證</strong>。<br>
        <strong class="text-slate-300">這不是「測試」：</strong>所有參數都是固定常數，因此<strong>不論你的金額多少、持有什麼股票，回本年數與倍數都完全相同</strong>，只有金額被等比例縮放。
        它示範的是「${draw?'固定提領':'不中斷投入'}」的算術效果，不是對你這個組合的預測。
      </div>`;
@@ -8451,13 +8546,14 @@ const GUIDE = [
    ['自選股清單','百大企業的即時體檢表：收盤價、損益、大戶籌碼、負債比、本益比、動物狀態、長線位階。'],
    ['區塊 E 目標價','每檔股票的<strong>長／中／短三組具體價格</strong>，以及對應的動態調倉動作。按 🎯 或用下拉選單切換。'],
    ['區塊 B 配置','只計算<strong>自選清單</strong>內的部位（百大資料庫的其他 97 檔不列入），檢查單一個股是否超過 30% 上限。'],
-   ['區塊 C 風險','負債比、鱷魚虧損提醒、以及「黑天鵝壓力測試」——模擬資產腰斬後靠紀律扣款的復原路徑。<br><span class="text-slate-400">v93b：這裡原本寫「鱷魚停損」，那是舊哲學——🐊 只是告訴你這筆虧超過 15%，本頁不會叫你停損。</span>'],
-   ['區塊 D 心理','三題自我檢視，抓出鴕鳥、小雞、綿羊三種最傷報酬的行為偏誤。'],
+   ['區塊 C 風險','負債比、鱷魚虧損提醒、以及「黑天鵝壓力測試」——模擬資產腰斬後靠紀律扣款的復原路徑。'],
+   /* v93e：原文寫「三種最傷報酬的行為偏誤」——「最」需要排名證據，本頁沒有。 */
+   ['區塊 D 心理','三題自我檢視，對應 🦩 鴕鳥、🐔 小雞、🐑 綿羊 三種本頁會檢查的決策偏誤。'],
    ['隱私模式','右上角一鍵遮蔽成本、損益與市值金額，適合螢幕分享或把畫面給別人看。'],
    ['💾 資料儲存','自選清單與持倉會自動存在你的瀏覽器裡，<strong>下次打開不必重輸</strong>；也可匯出備份檔帶到別台電腦。詳見「🔐 分享與隱私」分頁。<span class="text-amber-300">注意：在嵌入式預覽視窗中無法儲存，需下載到電腦開啟。</span>']
   ]) +
   NOTE('amber','⚡ 為什麼要限制單頁 5 檔？',
-   `本頁對「幾乎不變」的資料做了快取（股名與產業 7 天、財報與除權息 12 小時、價格與本益比 30 分鐘、集保 6 小時），同一筆請求同時發出多次時也會合併成一次。快取只存在記憶體，重新整理就清空。<br>FinMind 免費方案的上限是<strong>每小時 600 次</strong>（未註冊 300 次），實際額度請到會員頁查看「api 每小時使用上限」。百大清單的股票每檔需要 <strong>${callsPerStock(false)}</strong> 次請求，一次查 100 檔就是 ${callsPerStock(false)*100} 次，<strong>約佔免費額度的 ${Math.round(callsPerStock(false)*100/600*100)}%</strong>；<strong>已加入自選的標的每檔是 ${callsPerStock(true)} 次</strong>（多抓 5 年序列、除權息、減資與現金流量表）。<span class="text-amber-300">v93 更正：這裡以前寫「有填成本」，但實際上只要加入自選就會多抓，不看有沒有填成本。</span>這幾個數字是程式當場算出來的，不是寫死的——舊版寫「4 次／7 次／400 次／67%」，那是 TaiwanStockPER 加進來之前的數字，系統性低估了四分之一。分頁抓取讓你把額度花在真正在看的股票上。若額度充足也可用「抓取全部」一次抓完——額度用盡時系統會立即中止並降級連線狀態，不會把剩餘額度打完。`)
+   `本頁對「幾乎不變」的資料做了快取（股名與產業 7 天、財報與除權息 12 小時、價格與本益比 30 分鐘、集保 6 小時），同一筆請求同時發出多次時也會合併成一次。快取只存在記憶體，重新整理就清空。<br>FinMind 免費方案的上限是<strong>每小時 600 次</strong>（未註冊 300 次），實際額度請到會員頁查看「api 每小時使用上限」。百大清單的股票每檔需要 <strong>${callsPerStock(false)}</strong> 次請求，一次查 100 檔就是 ${callsPerStock(false)*100} 次，<strong>約佔免費額度的 ${Math.round(callsPerStock(false)*100/600*100)}%</strong>；<strong>已加入自選的標的每檔是 ${callsPerStock(true)} 次</strong>（多抓 5 年序列、除權息、減資與現金流量表）。這幾個數字是程式當場算出來的，不是寫死的。分頁抓取讓你把額度花在真正在看的股票上。若額度充足也可用「抓取全部」一次抓完——額度用盡時系統會立即中止並降級連線狀態，不會把剩餘額度打完。`)
 },
 
 { k:'animals', t:'🦁 17 動物法則', html: ()=>
@@ -8471,7 +8567,7 @@ const GUIDE = [
    + '這個不對稱本身就會造成偏誤：一個只會警告的系統，會讓人以為「不動」永遠是安全的。<br><br>'
    + '因此補上六隻對照面。其中 <strong>🦈 鯊魚</strong>（大戶連兩週<strong>減持</strong>）與 🐋 鯨魚是完全對稱的條件；'
    + '<strong>🐎 駿馬</strong> 補的是處分效應的另一半——散戶不只「賠了不肯停損」（🐊 鱷魚），更常「賺了太早下車」，'
-   + '而舊版完全沒有機制提醒後者；<strong>🐢 烏龜</strong> 讓低負債這件事也看得見，不是只有高負債會被點名。') +
+   + '而一個只會警告的系統不會提醒後者；<strong>🐢 烏龜</strong> 讓低負債這件事也看得見，不是只有高負債會被點名。') +
   TABLE(['正面／機會','反面／風險','這一組在講什麼'],[
    ['🐂 公牛','🐻 公熊','大盤在年線之上／之下（互斥且窮盡）'],
    ['🐋 鯨魚','🦈 鯊魚','千張大戶連兩週增持／減持（對稱條件）'],
@@ -8510,7 +8606,7 @@ const GUIDE = [
      （改動說明留在註解，不要印在使用者看得到的地方：他要的是現在正確的名字，
        不是這一頁的版本沿革。） */
   NOTE('slate','🐆 附帶說明：獵豹',
-   '短期布林下軌的參考價標示為「獵豹突襲價」——這是描述<strong>短線戰術</strong>的比喻，不屬於 17 動物法則本身。<br>介面上還有幾個同樣是「借用動物名稱的價位標籤」：🐱 死貓頂 = 布林上軌、🐋 鯨魚護航點 = 最近三個月平均價（季線）、🐂 公牛蓄勢 = 長期便宜參考價。<br><span class="text-amber-300">v90 起，「長線價值位階」那一欄不再寫「便宜區（鯨魚吸籌 🐋）」「昂貴區（小豬過載 🐖）」，只寫「便宜區」「昂貴區」——同一個符號在同一列代表兩件不同的事，是使用者實際會看錯的地方。</span>調倉面板的「中期趨勢破壞」卡片已從 🦏 改為 📉，避免與負債比的 🦏 灰犀牛混淆。')
+   '短期布林下軌的參考價標示為「獵豹突襲價」——這是描述<strong>短線戰術</strong>的比喻，不屬於 17 動物法則本身。<br>介面上還有幾個同樣是「借用動物名稱的價位標籤」：🐱 死貓頂 = 布林上軌、🐋 鯨魚護航點 = 最近三個月平均價（季線）、🐂 公牛蓄勢 = 長期便宜參考價。<br><span class="text-slate-400">注意：「長線價值位階」那一欄只寫「便宜區」「昂貴區」，不放動物符號——同一個符號在同一列代表兩件不同的事，很容易看錯。調倉面板的「中期趨勢破壞」用 📉，跟負債比的 🦏 灰犀牛區分開。</span>')
 },
 
 { k:'targets', t:'💵 三維度目標價公式', html: ()=>
@@ -8518,8 +8614,8 @@ const GUIDE = [
      「適合分批建立部位」「應停止加碼、提高現金比重」「短線也該在此分批獲利了結」。
      免責條款自己失效比沒有免責更糟——它會讓使用者以為自己讀到的不是建議。 */
   P('這一頁給你的是<strong>具體的價格刻度</strong>，讓你自己判斷現在站在哪一格。三個維度分別回答三個不同的問題。<br>' +
-    '<strong class="text-amber-300">v93d 起，「意義」那一欄不再出現「應停止加碼」「該分批獲利了結」這一類的祈使句</strong>——' +
-    '它們是對資金配置的指示，而這一頁不知道你的年齡、現金需求、其他資產或健康狀況。<br>' +
+    '<strong class="text-amber-300">「意義」那一欄不會出現「應停止加碼」「該分批獲利了結」這一類的祈使句</strong>——' +
+    '那是對資金配置的指示，而這一頁不知道你的年齡、現金需求、其他資產或健康狀況。<br>' +
     '留下來的是價位本身與它代表的位置：那是機械推導的結果，看它，但要不要動、動多少，是你的判斷。') +
   H2('🏛️ 長期目標價 — 這家公司值多少錢？') +
   P('資料來源：綜合損益表<strong>最近 4 季累積 EPS</strong>。公式是最經典的本益比估值法。') +
@@ -8537,13 +8633,13 @@ const GUIDE = [
   H2('📊 中期目標價 — 波段趨勢還在嗎？') +
   TABLE(['目標價','公式','意義'],[
    ['🟢 季線（60 日均線）','最新 <strong>60MA 季線</strong>','股價回到季線、同時千張大戶連兩週增持。本頁把這叫做一種「形態」，它描述已經發生的事，不代表接下來會漲。'],
-   ['🔴 季線 −5%','60MA × <strong>0.95</strong>','跌破季線 5%，本頁把這個狀態叫做「中線趨勢遭破壞」。<br><span class="text-slate-400">v93d：原文接著寫「應停止加碼、提高現金比重」——那是對你資金配置的指示。策略卡實際上不會這樣說，它要你先分辨這是大盤系統性回檔還是這家公司出問題。</span>']
+   ['🔴 季線 −5%','60MA × <strong>0.95</strong>','跌破季線 5%，本頁把這個狀態叫做「中線趨勢遭破壞」。']
   ]) +
   H2('⚡ 短期目標價 — 情緒有沒有走極端？') +
-  P('取<strong>過去 20 個交易日收盤價</strong>，算出 20MA 月線與標準差 σ（樣本標準差），構成布林通道。') +
+  P('取<strong>過去 20 個交易日收盤價</strong>，算出 20MA 月線與標準差 σ（<strong>母體標準差</strong>，除以 n，與 Bollinger 的預設算法一致），構成布林通道。') +
   TABLE(['目標價','公式','意義'],[
-   ['🟢 短期跌過頭參考價（獵豹突襲 🐆）','20MA − 2σ（布林下軌）','短線極度超賣。在常態分配的<strong>假設下</strong>約 95% 的價格落在通道內；實證上股價報酬有厚尾與波動叢聚，實際涵蓋率約 88～90%，且 σ 隨波動率變動，<strong>在最需要這個訊號的極端行情中誤差最大</strong>。跌出下軌代表情緒走到相對極端。'],
-   ['🔴 短期漲過頭參考價（死貓頂 🐱）','20MA + 2σ（布林上軌）','短線極度過熱。<br><span class="text-slate-400">v93d：原文接著寫「短線也該在此分批獲利了結，騰出資金等回檔」——那是操作指示，而且「過熱之後會回檔」這件事本頁沒有回測過。策略卡實際上只陳述位置，並提醒來回一趟的成本約 0.6%。</span>']
+   ['🟢 短期跌過頭參考價（獵豹突襲 🐆）','20MA − 2σ（布林下軌）',`短線相對極端的位置。常態分配的直覺會說「95% 的價格落在通道內」，但${SOURCES.bollinger.what}而且 σ 會隨波動率變動，<strong>在最需要這個訊號的極端行情中誤差最大</strong>。跌出下軌代表情緒走到相對極端，<strong>不代表一定會反轉</strong>。`],
+   ['🔴 短期漲過頭參考價（死貓頂 🐱）','20MA + 2σ（布林上軌）','短線極度過熱。']
   ]) +
   H2('🔄 動態調倉：長線持股 × 短線價差') +
   P('把三個維度疊起來，就得到具體策略。系統會依下列<strong>優先序</strong>判定並顯示對應卡片：') +
@@ -8594,7 +8690,7 @@ const GUIDE = [
   TABLE(['本頁欄位','FinMind Dataset','計算方式與更新頻率'],[
    ['大盤指數與年線','<code>TaiwanStockPrice</code><br>(data_id=<code>TAIEX</code>)','抓取近 560 天日線，240MA = 最近 240 個交易日收盤均價。乖離率 =（收盤 − 240MA）÷ 240MA。每日收盤後更新。'],
    ['最新收盤價','<code>TaiwanStockPrice</code>','抓取近 520 天日線，取最後一筆收盤價。同一份資料同時供 20MA / 60MA / 240MA / 標準差計算，不重複請求。'],
-   ['本益比','<code>TaiwanStockPER</code>','<strong>直接取官方每日本益比</strong>，不是本頁自己算的。舊版用「股價 ÷ 近四季 EPS」自己算，會被財報基期換季影響；那條路已經停用。'],
+   ['本益比','<code>TaiwanStockPER</code>','<strong>直接取官方每日本益比</strong>，不是本頁自己算的。<span class="text-slate-400">用「股價 ÷ 近四季 EPS」自己算會被財報基期換季影響，所以本頁不走那條路。</span>'],
    ['EPS','<code>TaiwanStockFinancialStatements</code>','篩出 type 含 EPS 的欄位，取<strong>最近 4 個季度累加</strong>，只用來換算目標價與判斷獲利是否連續。季報公布後更新（約 3/5/8/11 月）。'],
    ['負債比','<code>TaiwanStockBalanceSheet</code>','總負債 ÷ 總資產，取最新一期資產負債表。<span class="text-slate-400">（註：總負債／總資產在資產負債表而非損益表，因此此欄使用 BalanceSheet 資料集。）</span>'],
    ['千張大戶變動','<code>TaiwanStockHoldingSharesPer</code>','取 HoldingSharesLevel 為「1,000,001 股以上」（即<strong>超過</strong> 1,000 張；恰好持有 1,000 張者不在此級距）的持股比例，計算<strong>最近兩週的週變動</strong>。集保每週五結算，下週一至二更新。'],
@@ -8620,7 +8716,7 @@ const GUIDE = [
    ['流量上限','FinMind 免費方案有每小時請求次數限制，超過會回傳 402。本頁已用「單頁 5 檔 + 每檔間隔 260ms」節流，但短時間內連續翻頁刷新仍可能觸頂。'],
    ['資料延遲','FinMind 為日頻資料，非即時報價。盤中看到的是<strong>前一交易日收盤價</strong>。'],
    ['千張大戶需付費','「千張大戶變動」用的 <code class="bg-slate-800 px-1 rounded text-[10px]">TaiwanStockHoldingSharesPer</code> 資料集，FinMind 官方標明<strong>只限 backer／sponsor 會員使用</strong>。免費帳號抓不到，因此這一欄會顯示「—」、<strong>🐋 鯨魚與 🦈 鯊魚都不會亮</strong>、策略卡 E 也永遠不會觸發。系統偵測到之後會<strong>自動停用這個請求</strong>，每檔省下 1 次額度（總量的 25%）。'],
-   ['本益比改用官方數字','「本益比」欄位取自 <code class="bg-slate-800 px-1 rounded text-[10px]">TaiwanStockPER</code>（證交所每日公布的個股本益比、股價淨值比與殖利率，FinMind 免費層即可取得），標示為 <span class="text-emerald-400">官方</span>。舊版是用「股價 ÷ 近四季 EPS」自己算，那條路會被台灣財報的<strong>累計制(YTD)</strong>、四季不連續、財報過期、KY 股與金控子公司抓不到等問題影響。官方數字缺漏時才退回自算，並標示為 <span class="text-slate-400">自算</span>。'],
+   ['本益比改用官方數字','「本益比」欄位取自 <code class="bg-slate-800 px-1 rounded text-[10px]">TaiwanStockPER</code>（證交所每日公布的個股本益比、股價淨值比與殖利率，FinMind 免費層即可取得），標示為 <span class="text-emerald-400">官方</span>。<span class="text-slate-400">用「股價 ÷ 近四季 EPS」自己算，會被台灣財報的<strong>累計制（YTD）</strong>、四季不連續、財報過期、KY 股與金控子公司抓不到等問題影響，所以本頁不走那條路。</span>官方數字缺漏時才退回自算，並標示為 <span class="text-slate-400">自算</span>。'],
    ['位階怎麼判定的','優先序有三層，畫面上會標明用的是哪一層：<br>① <strong>這檔自己的歷史分位</strong>——用官方 PER 的近 5 年日序列取第 20／50／80 百分位。<strong>三條線一個編出來的數字都沒有</strong>，中華電跟中華電比、台積電跟台積電比。需要至少約一年的資料。<br>② <strong>同業橫斷面中位數</strong>——同產業已取得真實資料的股票中位數當中軸，區間寬窄取自產業慣例。<br>③ <strong>產業慣用區間</strong>——金融型 10～15、科技成長型 20～40、穩定消費／公用型 10～18、成熟傳統型 8～12。<strong>這一層是業界經驗法則，未經回測</strong>，只在前兩層都湊不到資料時使用。<br>金融保險業一律改用<strong>股價淨值比（PBR）</strong>的自身歷史分位，因為那才是實務上看金融股的方式。'],
    ['除權息與減資','<strong>所有自選清單</strong>的標的，會另外抓 <code class="bg-slate-800 px-1 rounded text-[10px]">TaiwanStockDividendResult</code> 與 <code class="bg-slate-800 px-1 rounded text-[10px]">TaiwanStockCapitalReductionReferencePrice</code>（兩者免費）。若你輸入成本之後發生過除權息或減資，損益欄會出現「⚠ 成本已過期」並附上<strong>建議的調整後成本</strong>。系統<strong>不會自動改你的數字</strong>，請自行核對券商對帳單後用 ✏️ 更新。'],
    ['即時報價需付費','「更新即時報價」用的 <code class="bg-slate-800 px-1 rounded text-[10px]">taiwan_stock_tick_snapshot</code> 端點，FinMind 官方標明<strong>只限 sponsor 會員使用</strong>，免費帳號會被拒絕。被拒絕時瀏覽器只會顯示 <code class="bg-slate-800 px-1 rounded text-[10px]">Failed to fetch</code>（因為錯誤回應沒帶 CORS 標頭），那<strong>不是</strong>你的 Token 或網路有問題。本頁的位階與目標價本來就用收盤價計算，不受影響。'],
@@ -8676,7 +8772,7 @@ const GUIDE = [
   P('這一頁把本程式用到的每一個門檻值攤開來，包含它的來源。<strong class="text-amber-300">凡是寫「無依據」的，就是我自己訂的，沒有任何歷史驗證支持它是對的數字。</strong>') +
   NOTE('amber','⚠️ 哪些可以回測、哪些不行',
    '<strong>跟財報有關的門檻，難回測。</strong>要驗證它必須知道「當年那一天」看得到的財報數字，但公開 API 給的是<strong>後來修正過的版本</strong>——用它去回測，等於拿今天才知道的資訊去做當年的決定，結果一定偏好。這種資料叫 point-in-time 資料，免費來源沒有。折衷做法是把財報往後遞延（季報 45 天、年報 90 天）近似當年的公布時點。<br><br>' +
-   '<strong>跟價格有關的門檻，其實可以回測。</strong>收盤價不會被事後修正，均線與標準差都是從價格算出來的。<span class="text-amber-300">下表寫「無回測」，意思是「還沒有人去做」，不是「做不到」。</span>這是先前的說法講得太絕，已更正。<br><br>' +
+   '<strong>跟價格有關的門檻，其實可以回測。</strong>收盤價不會被事後修正，均線與標準差都是從價格算出來的。<span class="text-amber-300">下表寫「無回測」，意思是「還沒有人去做」，不是「做不到」。</span>' +
    '本程式的做法是：<strong>能改成「這檔自己的歷史分位」的全部改掉</strong>（本益比與股價淨值比已經改完）；<strong>改不掉的就在這裡老實列出來</strong>，而不是寫一段話說服你它是對的。') +
   THRESH([
    ['本益比 便宜／合理／昂貴','個股位階燈號','<strong class="text-emerald-300">這檔自己近 5 年的第 20／50／80 百分位</strong>（官方 TaiwanStockPER）。歷史不足 250 天時退回同業中位數，再不足才用產業慣用區間','<span class="text-amber-300">否——是從資料算出來的，但沒有任何回測證明它能預測後續報酬</span>'],
@@ -8684,7 +8780,7 @@ const GUIDE = [
    ['負債比 &gt; 80%','🦏 灰犀牛','財務分析常見的高槓桿參考線。<span class="text-amber-300">無回測</span>。原本是 70%，但二元閾值不適合連續量（0.7000 不是、0.7001 是，而負債比本身是四捨五入值），已改成分級：60～80% 只標「偏高」','不影響位階燈號'],
    [`未實現損益 &lt; ${CROC_PNL}%`,'🐊 鱷魚','市場常見的停損參考線。<span class="text-amber-300">無依據、無回測</span>','不影響位階燈號'],
    [`單一持股 &gt; ${(CONC_MAX*100).toFixed(0)}%`,'🐖 集中度警示','資產配置常見的分散度參考線。<span class="text-amber-300">無回測</span>','不影響位階燈號'],
-   ['20MA ± 2 個標準差','布林通道上下軌','Bollinger 的原始定義（產業標準）。<span class="text-amber-300">但常態分配假設在極端行情下最不成立</span>，實際涵蓋率約 88～90% 而非 95%','不影響位階燈號'],
+   ['20MA ± 2 個標準差（母體標準差，除以 n）','布林通道上下軌',`Bollinger 的原始定義（產業標準）。<span class="text-amber-300">${SOURCES.bollinger.what}</span><div class="text-[11px] text-slate-500 mt-1">依據：${SOURCES.bollinger.who}｜${SOURCES.bollinger.where}</div>`,'不影響位階燈號'],
    ['季線 × 0.95（−5%）','中期趨勢破壞','<span class="text-amber-300">無依據、無回測</span>','不影響位階燈號'],
    ['大盤乖離 −10% ／ +15%','區塊 A 大盤環境','<span class="text-amber-300">無依據、無回測</span>','不影響個股燈號'],
    ['本益比絕對水準 ±10%（log 距離）','出場參考的「差不多的價位」','統計上的鄰域寬度選擇。<span class="text-amber-300">實測改成 ±3 或 ±20，結論會明顯不同</span>','不影響位階燈號'],
@@ -8717,9 +8813,19 @@ const GUIDE = [
    ['負債比要看產業','金融業負債比天生 85～95%（存款計入負債），所以系統<strong>一律不對金融／保險／銀行／證券／租賃業亮 🦏</strong>。要看它們的財務體質請改查資本適足率與逾放比，這一頁沒有這兩個數字。'],
    ['歷史不代表未來','黑天鵝壓力測試採「年化 7% 成長 + 3.5% 股息率」的假設情境，僅供理解複利與紀律的價值，不是報酬預測。'],
    ['分批不是萬靈丹','「分批買進」能降低擇時風險，但若公司基本面真的惡化，分批只會讓你買進更多壞資產。攤平前務必確認體質。'],
-   ['布林通道的統計假設','20MA ± 2σ 的「95% 涵蓋率」來自常態分配假設，而股價報酬並非常態分配，實際涵蓋率約 88～90%，極端行情時誤差最大。三個維度中，短線訊號的可靠度最低。'],
+   ['布林通道的統計假設',`20MA ± 2σ <strong>並不代表真的有 95% 的股價會被包住</strong>。${SOURCES.bollinger.what}所以跌出上下軌只是「相對極端的位置」，<strong>不是一定會反轉</strong>。三個維度中，短線訊號的可靠度最低。<div class="text-[11px] text-slate-500 mt-1">依據：${SOURCES.bollinger.who}｜${SOURCES.bollinger.where}</div>`],
    ['心理防呆一定可以被略過','這一頁不能下單，所以任何警告都攔不住你去券商 App 按賣出。它的價值只在於<strong>讓你多想 10 秒</strong>，不是替你做決定，也不是把你擋下來。']
   ]) +
+  H2('這一頁引用了哪些外部依據') +
+  P('本頁絕大多數的說法都改寫成<strong>機制</strong>（這件事為什麼會影響你），'
+    + '而不是宣稱一個沒有來源的統計結果。<br>'
+    + '只有同時滿足兩個條件的才會保留引用：<strong>①</strong> 它是原始提出者對自己方法的定義或校正，'
+    + '不是第三方的實證排名；<strong>②</strong> 本頁的數字不依賴它成立，引用只是幫你理解。<br>'
+    + '<span class="text-slate-400">所以你不會在這一頁看到「某某位置之後的報酬比較好／比較差」'
+    + '或「哪一種行為傷害最大」這一類句子——那需要排名或回測證據，本頁沒有。</span>') +
+  TABLE(['依據','它說什麼','本頁為什麼引用它'],
+    Object.values(SOURCES).map(x => [
+      `${x.who}<div class="text-[11px] text-slate-500 mt-1">${x.where}</div>`, x.what, x.why ])) +
   NOTE('slate','資料正確性',
    'FinMind 為第三方開放資料來源，資料可能延遲、缺漏或有誤。所有數字請以<strong>證交所、櫃買中心與公司官方公告</strong>為準。本頁對資料正確性不做任何保證。')
 }
