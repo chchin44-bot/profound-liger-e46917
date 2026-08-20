@@ -1,9 +1,7 @@
 #!/bin/bash
 # index.html → source.html（反推）
-#
 # v93d 起流程反過來了：index.html 是唯一主檔，日常修改直接改它。
-# source.html 從此是**衍生產物**，只是為了保留「可讀的底稿 + 可重建」的能力。
-# 每次改完 index.html 就跑這支，讓兩者不會各自漂移。
+# source.html 是衍生產物，只為了保留「可讀底稿 + 可重建」的能力。
 set -e
 cd /mnt/user-data/working
 python3 - <<'PY'

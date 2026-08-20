@@ -4035,68 +4035,306 @@ function peBands(ind, d){
     label:`${A.name} 的產業慣用區間 ${A.lo}～${A.hi} 倍（業界經驗法則，未經回測）`,
     short:'產業慣例' };
 }
+/* ══════════════════════════════════════════════════════════════════════
+   長線估值引擎 longValuation()（v93g）
+   ══════════════════════════════════════════════════════════════════════
+   在這之前，valuate() 一個物件同時扛五件不同的事：
+     用哪把尺（method）、跟什麼比（basis）、量到哪（position）、
+     這把尺這次可不可信（confidence）、可不可以出價（pricing）。
+   五件事擠在一起的後果不是理論問題，是這一頁真的發生過的事：
+     ·「獲利大幅波動」＝不可信 → 連價位一起消失（其實價位算得出來）
+     · 金融股不可出價 → 標題卻仍寫「本益比估值法」
+     · 說明頁教「EPS × 自身歷史 PE」→ 但 production 有五種組合
+   所以拆開。拆開之後，finPBR／trap／longBroken／muted 這些特例
+   才有機會退回成資料，而不是每次再長一個 if。
+
+   最重要的一條契約（使用者定的）：**pricing 不由 confidence 自動決定。**
+   「我仍然可以告訴你這把尺量到哪裡、價位是多少，但要提醒你分母正在快速變動」
+   跟「有不確定性所以所有數字消失」是兩種不同的產品，我們要前者。
+
+   第二條契約（這一版加的，理由見下）：**信心不足時不發綠燈。**
+   實測：長榮式循環頂點 epsVals=[12,22,35,45]（cv 0.44、spread 3.75、獲利在最高點）
+   與單純的成長股 [1,2,3,4]（cv 0.45、spread 4.00、獲利在最高點）
+   在 EPS 形狀上**完全無法區分**。也就是說「單調上升」這個形狀本身
+   沒有能力分辨「公司在成長」與「景氣循環走到頂」。
+   既然分不出來，就不能因為「它是單調上升」而給綠燈——
+   那正是 v49 那條測試（景氣循環股不給綠燈）當初要擋的事。
+   解法不是把價位藏起來（那違反第一條契約），而是價位照給、燈號降一階、
+   並且說出降階的理由。 */
+
+/* EPS 的形狀。不是 volatile true/false ——「幅度大」跟「不可預測」是兩件事，
+   1→2→3→4 的幅度是 300%，但它一點都不難預測。 */
+function epsShape(d){
+  const st = epsStats(d);
+  if(!st) return 'insufficient';
+  const x = st.xs;                                   // epsVals 由舊到新（epsFromRows 的 last4 是升冪日期）
+  const up = x.every((v,i) => i === 0 || v > x[i-1]);
+  const dn = x.every((v,i) => i === 0 || v < x[i-1]);
+  /* 單調要先判。否則 1→2→3→4 會先被 cv > 0.5 抓走，
+     一家穩定成長的公司就因為「成長太快」被拒絕估值——那是純損失。 */
+  if(up) return 'monotonic_up';
+  if(dn) return 'monotonic_down';
+  if(st.cv > 0.50 || (st.atPeak && st.spread > 3)) return 'erratic';
+  return 'stable';
+}
+
+/* 理由碼。**理由碼不等於文案**——這是 🐖 那一輪學到的：
+   一旦文案可以被手寫進判定層，它就會漂移，而且沒有測試會發現。
+   所以判定層只吐代碼，文案全部到 LONG_REASON_COPY 這一張表拿。
+   將來 UI 有五個地方要講同一件事，五個地方拿的是同一份。 */
+const LONG_REASON_COPY = {
+  DATA_NONE:        { gist:'還沒有這一檔的真實資料', detail:'尚未連線或這一檔還沒抓到資料，任何估值都不成立。', lim:'—' },
+  DATA_STALE:       { gist:'資料太舊', detail:'這批資料已經超過 30 天或日期無法判讀，用它算出來的位階沒有參考價值。', lim:'—' },
+  FINANCIAL_PBR:    { gist:'金融業改看股價淨值比', detail:'銀行、保險、證券、租賃的獲利結構是高槓桿與監理資本的結果，本益比對它們沒有參考價值，所以位階改用這一檔自己的股價淨值比歷史來判。', lim:'本頁沒有可靠的「每股淨值 → 價格」換算，所以不輸出金融股的長線目標價。請一併確認資本適足率與逾放比。' },
+  FINANCIAL_NO_PBR: { gist:'金融業，但還沒有足夠的 PBR 歷史', detail:'要用股價淨值比判位階，至少需要約一年的官方 PBR 序列，目前還沒取得。', lim:'在拿到之前，這一檔不判定長線位階——用本益比硬判會給出錯誤的結論。' },
+  EPS_MISSING:      { gist:'沒有可用的每股盈餘', detail:'每股盈餘為負或缺漏，本益比算不出來。', lim:'請改看營收、毛利與現金流。' },
+  EPS_ERRATIC:      { gist:'獲利忽高忽低', detail:'近四季的獲利既不是穩定、也不是單方向變動，而是大幅跳動。本益比的分母不穩，同一個股價會算出差很多的本益比。', lim:'這種形狀下本頁不給位階，也不出長線價位。' },
+  EPS_MONOTONIC_UP: { gist:'獲利連四季走高', detail:'近四季的每股盈餘一路往上。分母正在放大，本益比會跟著看起來變低。', lim:'本頁分不出「公司在成長」與「景氣循環走到頂」——兩者的近四季獲利形狀一模一樣（實測 cv 與高低差幾乎相同）。所以價位照給，但不給綠燈。' },
+  EPS_MONOTONIC_DOWN:{ gist:'⚠ 獲利連四季縮小', detail:'近四季的每股盈餘一路往下。分母正在縮小，而近四季累積的數字裡還留著過去比較高的獲利——現在看到的低本益比，有一部分是被過去美化出來的。', lim:'這是比「獲利成長」更需要打折的方向：它會讓一檔越來越差的公司看起來越來越便宜。' },
+  EPS_CYCLE_PEAK:   { gist:'獲利剛好在近幾季的最高點', detail:'近四季獲利在最高點，而且高低差超過 3 倍。景氣循環股走到頂點時就是這個形狀，此時本益比會顯示為歷史最低。', lim:'本頁沒有判斷景氣位置的能力，只能告訴你形狀長這樣。' },
+  EPS_AMBIGUOUS:    { gist:'財報口徑未確認', detail:'官方沒有公布這一檔的本益比，無法確認財報給的是單季還是累計，本頁取比較保守的那一個。', lim:'這是本頁替你做的選擇，不是已確認的事實。' },
+  PE_HISTORY_TRENDING:{ gist:'過去五年的本益比是一條趨勢，不是一個分布', detail:'這一檔的本益比在五年間單方向移動。分位數是「跟自己的分布比」，分布不存在時分位數沒有意義——綠燈可以連亮三年而股價腰斬。', lim:'這種形狀下本頁不把分位數當可靠的長線尺。' },
+  PE_BASIS_IND:     { gist:'比的是同業，不是它自己的歷史', detail:'這一檔自己的本益比歷史不足，改用同產業的中位數當中軸，區間寬窄取自產業慣例。', lim:'同業中位數會被整個產業的高低估一起帶走，而且區間寬窄是慣例不是資料。' },
+  EPS_INSUFFICIENT: { gist:'近四季獲利資料不足', detail:'目前沒有足夠且連續的單季每股盈餘，本頁無法判斷獲利是穩定、上升、下降還是亂跳。', lim:'價位仍然依現有的估值資料算得出來，但這次判定的可信度要打折。' },
+  PRICE_NO_EPS_BASE:{ gist:'算不出換算價的分母', detail:'既沒有可用的每股盈餘，也沒有官方本益比可以反推分母，因此無法把倍數換算成價格。', lim:'位階仍可能判得出來（那只需要本益比本身），但價位不行。' },
+  PRICE_MODEL_DIVERGED:{ gist:'換算出來的價位已經和股價脫鉤', detail:'現價高於換算的昂貴價 1.5 倍以上，或低於便宜價的 0.67 倍。這時候那三個數字在數學上仍然成立（「本益比回到過去水準時的價格」），但它已經不是一個可以拿來對照的價位。', lim:'本頁只知道尺與價格脫鉤，不知道原因是成長、循環還是別的。' },
+  PE_BASIS_CONV:    { gist:'比的是產業慣例，連同業樣本都不足', detail:'自身歷史與同業樣本都不夠，只能退到業界經驗法則的區間。', lim:'這是三種基準裡最弱的一種，未經回測，只能當粗略的方向感。' },
+};
+
+const LONG_POS_LEVEL = { cheap:'buy', fair:'hold', warm:'hold', rich:'sell', unknown:'na' };
+
+/* 理由 → 文字。**全站只有這一支**（v93h）。
+   在這之前，判定層吐代碼、LONG_REASON_COPY 有一份說法，而 valuate() 又手寫第二份說法——
+   內容當時沒有衝突，但那正是 🐖 事件前一天的狀態：兩份副本、還沒開始漂。
+   所以趁還沒漂就收斂：valuate() 從此不解釋理由，只決定要不要顯示、顯示在哪一層。
+     gist   給小白（一句話）
+     detail 給一般使用者（為什麼）
+     lim    給高手／審計者（它不知道什麼） */
+function longReasons(L){ return (L && L.reasons || []).filter(c => LONG_REASON_COPY[c]); }
+function reasonGist(L){ return longReasons(L).map(c => LONG_REASON_COPY[c].gist); }
+/* 內嵌在既有說明句尾巴的一段（第一／二層用）。 */
+function reasonInline(L){
+  return longReasons(L).map(c => `<br><strong>${LONG_REASON_COPY[c].gist}</strong>：${LONG_REASON_COPY[c].detail}`).join('');
+}
+/* 第四層：可信度 → 原因 → 限制，攤成一張證據鏈。 */
+function reasonPanel(L){
+  const cs = longReasons(L);
+  if(!cs.length) return '';
+  const CONF = { normal:['可以參考','text-emerald-300'], limited:['有限','text-amber-300'], off:['本頁這次不判定','text-rose-300'] }[L.confidence] || ['—','text-slate-300'];
+  const PRICE = L.pricing === 'available' ? '長線價位：照常顯示' : '長線價位：這次不顯示';
+  return `<div class="rounded-lg border border-slate-700 bg-slate-900/60 p-2.5 mt-2 text-[13px] leading-relaxed">
+    <div class="flex items-center gap-2 flex-wrap mb-1">
+      <span class="text-slate-400">這次的判定可信度</span>
+      <strong class="${CONF[1]}">${CONF[0]}</strong>
+      <span class="text-slate-500">·</span><span class="text-slate-300">${PRICE}</span>
+    </div>
+    <div class="text-slate-400 mt-1">原因</div>
+    <ul class="list-disc pl-5 text-slate-100">${cs.map(c=>`<li>${LONG_REASON_COPY[c].gist}</li>`).join('')}</ul>
+    <details class="mt-1"><summary class="cursor-pointer select-none text-[12px] text-slate-300">展開：這些原因分別是什麼意思，以及它不知道什麼</summary>
+      <div class="mt-1 space-y-1.5">${cs.map(c=>`<div>
+        <div class="text-slate-200"><strong>${LONG_REASON_COPY[c].gist}</strong>：${LONG_REASON_COPY[c].detail}</div>
+        <div class="text-slate-400">它不知道什麼：${LONG_REASON_COPY[c].lim}</div></div>`).join('')}</div>
+    </details></div>`;
+}
+
+/* 唯一的長線估值判定。回傳的是「事實與能力」，不是文案，也不是顏色。 */
+function longValuation(d, peArg){
+  const R = [];
+  const pe = (peArg === undefined) ? (d && d.pe) : peArg;
+  const fin = { metric:null, trend:'unknown', confidence:'unknown' };
+  const mk = o => {
+    const r = Object.assign({ method:'none', basis:null, position:'unknown',
+      confidence:'off', pricing:'blocked', prices:null, bands:null, pe:null, pbr:null, pctl:null,
+      denominator:fin, reasons:R.slice() }, o);
+    r.capabilities = {
+      position:   r.confidence !== 'off' && r.method !== 'none',
+      longPrices: r.pricing === 'available',
+      /* 第三層（調倉建議）只有在這把尺可信時才給具體動作。
+         使用者定的：估值可信度 = limited 時，第三層的 PE 策略要降級。 */
+      tactic:     r.confidence === 'normal' && r.pricing === 'available'
+    };
+    return r;
+  };
+  /* 這道閘門跟舊版 valuate() 一模一樣：只擋「真實但過期」。
+     示範值／未連線不在這裡擋——那是顯示層的事（VAL_DEMO／VAL_PRIV），
+     判定層要保持純函式，否則隱私模式又會滲進判定（v90 的六個連鎖後果）。 */
+  if(!d){ R.push('DATA_NONE'); return mk({}); }
+  if(dataReal(d) && !dataUsable(d)){ R.push('DATA_STALE'); return mk({}); }
+
+  /* ── 金融業：尺換成股價淨值比 ── */
+  if(isFinancial(d.ind, d.id)){
+    const pb = d.pbr, hb = histBands(d.pbrHist);
+    if(pb > 0 && hb){
+      R.push('FINANCIAL_PBR');
+      const pos = pb <= hb.cheap ? 'cheap' : pb <= hb.fair ? 'fair' : pb <= hb.rich ? 'warm' : 'rich';
+      return mk({ method:'pbr', basis:'self', position:pos, confidence:'normal',
+        /* 位階可信，但價位不可出——這正是 pricing 必須獨立於 confidence 的實例。 */
+        pricing:'blocked', bands:hb, pbr:pb, pctl:histPct(d.pbrHist, pb),
+        denominator:{ metric:'book_value', trend:'unknown', confidence:'known' } });
+    }
+    R.push('FINANCIAL_NO_PBR');
+    return mk({ pbr:pb > 0 ? pb : null });
+  }
+
+  /* ── 一般公司：本益比 ── */
+  if(pe === null || !isFinite(pe) || pe <= 0){ R.push('EPS_MISSING'); return mk({}); }
+
+  const shape = epsShape(d);
+  const st = epsStats(d);
+  const trend = shape === 'monotonic_up' ? 'up' : shape === 'monotonic_down' ? 'down'
+              : shape === 'erratic' ? 'unstable' : shape === 'stable' ? 'stable' : 'unknown';
+  const den = { metric:'eps', trend, confidence: d.epsAmbiguous ? 'ambiguous' : 'known' };
+  if(d.epsAmbiguous) R.push('EPS_AMBIGUOUS');
+
+  if(shape === 'erratic'){ R.push('EPS_ERRATIC'); return mk({ pe, denominator:den }); }
+
+  let confidence = 'normal';
+  if(shape === 'monotonic_up'){
+    R.push('EPS_MONOTONIC_UP'); confidence = 'limited';
+    if(st && st.atPeak && st.spread > 3) R.push('EPS_CYCLE_PEAK');
+  } else if(shape === 'monotonic_down'){
+    R.push('EPS_MONOTONIC_DOWN'); confidence = 'limited';
+  } else if(shape === 'insufficient'){
+    /* v93h：舊版這裡降了 confidence 卻沒有推理由碼，於是畫面會出現
+       「便宜區 · 但這把尺這次不夠可信」而 reasons 是空陣列——
+       降階說不出原因，等於把「不可信」變成一個沒有證據的形容詞。
+       新契約：**任何 confidence 降級都必須留下 machine-readable 的理由。** */
+    R.push('EPS_INSUFFICIENT'); confidence = 'limited';
+  }
+
+  const B = peBands(d.ind, d);
+  if(B.basis === 'ind'){ R.push('PE_BASIS_IND'); }
+  if(B.basis === 'conv'){ R.push('PE_BASIS_CONV'); if(confidence === 'normal') confidence = 'limited'; }
+  /* 趨勢不重算——peBands() 已經算過並掛在 B.trending 上。
+     再算一次就是這份程式的招牌缺陷「同一個概念 N 份手抄副本」，
+     而且 perTrending 是 O(1200)，一次 renderAll 會呼叫近三百次。 */
+  if(B.trending){ R.push('PE_HISTORY_TRENDING'); confidence = 'limited'; }
+
+  const position = pe < B.cheap ? 'cheap' : pe <= B.fair ? 'fair' : pe <= B.rich ? 'warm' : 'rich';
+
+  /* ── 價位換算，以及「這組價位還算不算數」──────────────────────
+     v93h：這一段以前住在 buildTargets() 裡，於是「長線價位要不要顯示」有兩個權威：
+       A. longValuation().pricing
+       B. buildTargets().longBroken／longOk
+     兩邊可以互相打架（A 說可以顯示、B 把它關掉），而 UI 又各自去問不同的那一個。
+     現在只留一個：**longValuation().pricing 是第二層唯一的價格權威**。
+     buildTargets 從此只負責把結果抄過去，不再自己判斷。
+     longBroken 也不再是一個 flag，而是一個理由碼 PRICE_MODEL_DIVERGED。 */
+  const pbc = perBaseClose(d);
+  /* 倍數來自官方 PER 的分位，分母就必須是官方 PER 隱含的 EPS，
+     不能拿自算的 TTM EPS 去乘——那是單位錯配，同一頁會算出差 16% 的兩組目標價。 */
+  const epsBase = (d.per > 0 && pbc > 0) ? (pbc / d.per) : d.eps;
+  let prices = null, pricing = 'blocked';
+  if((d.eps && d.eps > 0) || (d.per > 0 && pbc > 0)){
+    prices = { cheap:+(epsBase*B.cheap).toFixed(1), fair:+(epsBase*B.fair).toFixed(1),
+               rich:+(epsBase*B.rich).toFixed(1), epsBase,
+               epsBaseSrc:(d.per > 0 && pbc > 0) ? 'official' : 'calc',
+               epsBaseAsOf:(d.per > 0 && pbc > 0) ? (d.perAsOf || d.asOf || null) : null,
+               peNow:(d.price > 0 && epsBase > 0) ? +(d.price / epsBase).toFixed(1) : null };
+    pricing = 'available';
+    /* ══ v72：分位模型失效的判定 ══════════════════════════════
+       實測 2327 國巨（2026-08-18）：近四季 EPS 14.88、現價 608，本益比 40.9 倍；
+       但它自己近 4.8 年的本益比區間是 5.7~89.8 倍，第 20／50／80 百分位是 9.5／12.6／17.1。
+       於是畫面印出「便宜 141.1、合理 187.1、昂貴 254.0」——
+       **現價是「昂貴價」的 2.4 倍**，而同一頁的季線是 780.7（本益比 52 倍）。
+       三個價位擺在一起互相矛盾，對不看線圖的人來說那看起來像「這檔貴了三倍該賣」。
+       判定條件只用一條，而且是可以直接量的那一條：現價離換算出來的區間太遠。
+       刻意**不**把 perTrending 也拿來當停止條件：本益比長年緩步上修的績優股
+       仍然貼著股價、仍然有參考價值。這裡要擋的是「數字明顯荒謬」，不是「數字不完美」。 */
+    if((d.price > 0) && ((prices.rich > 0 && d.price > prices.rich * 1.5) ||
+                         (prices.cheap > 0 && d.price < prices.cheap * 0.67))){
+      R.push('PRICE_MODEL_DIVERGED'); pricing = 'blocked';
+    }
+  } else {
+    R.push('PRICE_NO_EPS_BASE');
+  }
+
+  return mk({ method:'pe', basis:B.basis, position, confidence, pricing, prices,
+    bands:B, pe, pctl: B.basis === 'self' ? histPct(d.perHist, pe) : null, denominator:den });
+}
+/* 顯示層唯一的降階規則：**信心不足時不發綠燈**。
+   位階仍然是 cheap（尺確實指在那裡、價位也照給），但燈號不給 🟢。
+   理由見 longValuation 開頭：單調上升的形狀分不出成長與循環頂點。 */
+function longNoGreen(L){ return L.position === 'cheap' && L.confidence !== 'normal'; }
+
 /* 隱私是「顯示設定」，不能進入判定層。舊版在這裡 return VAL_PRIV，連鎖造成六個後果：
    🐖／🐔 防呆守門失效（level 被打成 'na'）、🐎 駿馬憑空多出來、位階篩選整個失效、
    表格仍印紅綠色與 croc-row、🐊 彈窗直接印「未實現損益為 -28.57%」。
    正確做法：valuate 保持純函式，由 renderTable／renderTop100 在「印出來的那一刻」換成 VAL_PRIV。 */
 function valuate(pe, d){
-  if(d && dataReal(d) && !dataUsable(d)) return VAL_TOOOLD;
-  const ind = d && d.ind;
-  /* 金融、保險、銀行、證券、租賃：實務上看的是股價淨值比，不是本益比。
-     官方 PBR 序列拿得到，就用這檔自己的 PBR 歷史分位判定。 */
-  if(isFinancial(ind, d && d.id)){
-    const pb = d && d.pbr, hb = d && histBands(d.pbrHist);
-    if(pb > 0 && hb){
-      const pc = histPct(d.pbrHist, pb);
-      /* v89：「第 78 百分位」對這一頁的使用者不成立。同一句話換成「過去五年裡有幾成的日子比現在便宜」，
-         那是同一件事，但他讀得懂。技術名詞留在括號裡，要查得到出處。 */
-      const note = `金融業看的是<strong>股價淨值比（PBR）</strong>，不是本益比。現在是 <strong>${fmt(pb,2)}</strong>——過去 ${(hb.n/250).toFixed(1)} 年裡，大約有 <strong>${pc}%</strong> 的日子比今天便宜（歷史區間 ${hb.lo}～${hb.hi}，術語：第 ${pc} 百分位）。請一併確認資本適足率與逾放比。`;
-      if(pb <= hb.cheap) return { level:'buy', key:'cheap', light:'🟢', label:'PBR 歷史低檔', method:'pbr', basis:'self', cls:'text-emerald-300 bg-emerald-500/10 border-emerald-500/40', bands:hb, note };
-      if(pb <= hb.fair)  return { level:'hold', key:'fair', light:'🟡', label:'PBR 中位以下', method:'pbr', basis:'self', cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:hb, note };
-      if(pb <= hb.rich)  return { level:'hold', key:'warm', light:'🟡', label:'PBR 中位以上', method:'pbr', basis:'self', cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:hb, note };
-      return { level:'sell', key:'rich', light:'🔴', label:'PBR 歷史高檔', method:'pbr', basis:'self', cls:'text-rose-300 bg-rose-500/10 border-rose-500/40', bands:hb, note };
-    }
-    if(pe !== null && isFinite(pe) && pe > 0)
-      return { level:'na', key:'fin', light:'🏦', label:'金融業 · 待取得 PBR 歷史', method:'none',
-               cls:'text-sky-300 bg-sky-500/10 border-sky-500/40',
-               note:`金融業要用<strong>股價淨值比（PBR）</strong>判定，但目前還沒有足夠的 PBR 歷史（至少需要約一年）。請按「${LBL_REFRESH_W}」取得官方資料。本益比 ${fmt(pe,1)} 倍對金融股沒有參考價值——那是高槓桿與監理資本結構的結果，不代表便宜。` };
+  /* v93g：這裡不再有任何判定規則——規則全部在 longValuation()。
+     valuate() 從此只做一件事：把「事實與能力」翻譯成這一頁既有的顯示契約
+     （level／key／light／label／cls／note）。兩者分開之後：
+       · 想知道「為什麼」的人讀 v.long.reasons（代碼，不是文案）
+       · 想改文案的人只能改 LONG_REASON_COPY，改不到判定
+     這正是 🐖 那一輪的結論：不要修好一句話，要讓那句話沒有能力被手寫。 */
+  const L = longValuation(d, pe);
+  const has = c => L.reasons.includes(c);
+  const wrap = (o) => Object.assign({ method:L.method, basis:L.basis, long:L }, o);
+
+  if(has('DATA_STALE')) return wrap(Object.assign({}, VAL_TOOOLD));
+  if(has('DATA_NONE'))  return wrap(Object.assign({}, VAL_NONE));
+
+  /* ── 金融業 ── */
+  if(L.method === 'pbr'){
+    const hb = L.bands, pc = L.pctl;
+    /* v89：「第 78 百分位」對這一頁的使用者不成立。同一句話換成「過去五年裡有幾成的日子比現在便宜」，
+       那是同一件事，但他讀得懂。技術名詞留在括號裡，要查得到出處。 */
+    const note = `金融業看的是<strong>股價淨值比（PBR）</strong>，不是本益比。現在是 <strong>${fmt(L.pbr,2)}</strong>——過去 ${(hb.n/250).toFixed(1)} 年裡，大約有 <strong>${pc}%</strong> 的日子比今天便宜（歷史區間 ${hb.lo}～${hb.hi}，術語：第 ${pc} 百分位）。請一併確認資本適足率與逾放比。`;
+    const M = { cheap:['buy','🟢','PBR 歷史低檔','text-emerald-300 bg-emerald-500/10 border-emerald-500/40'],
+                fair: ['hold','🟡','PBR 中位以下','text-amber-300 bg-amber-500/10 border-amber-500/40'],
+                warm: ['hold','🟡','PBR 中位以上','text-amber-300 bg-amber-500/10 border-amber-500/40'],
+                rich: ['sell','🔴','PBR 歷史高檔','text-rose-300 bg-rose-500/10 border-rose-500/40'] }[L.position];
+    return wrap({ level:M[0], key:L.position, light:M[1], label:M[2], cls:M[3], bands:hb, note });
   }
-  if(pe === null || !isFinite(pe) || pe <= 0)
-    return { level:'na', key:'na', light:'⚪', label:'資料不足', method:'none', cls:'text-slate-400 bg-slate-700/30 border-slate-600/40',
-             note:'EPS 為負或缺漏，無法以本益比評估，請改看營收與現金流。' };
-  /* 安全閘一：獲利劇烈波動 → 本益比不適用。 */
-  if(epsVolatile(d))
-    return { level:'na', key:'trap', light:'⚠️', label:'獲利大幅波動 · 不判定位階', method:'none',
+  if(has('FINANCIAL_NO_PBR'))
+    return wrap({ level:'na', key:'fin', light:'🏦', label:'金融業 · 待取得 PBR 歷史',
+             cls:'text-sky-300 bg-sky-500/10 border-sky-500/40',
+             /* v93h：理由的內容由 LONG_REASON_COPY 提供，這裡只補「怎麼辦」與這一檔的實際數字。 */
+             note:`${LONG_REASON_COPY.FINANCIAL_NO_PBR.detail}${LONG_REASON_COPY.FINANCIAL_NO_PBR.lim}請按「${LBL_REFRESH_W}」取得官方資料。`
+                  + ((pe !== null && isFinite(pe) && pe > 0) ? `<br>本益比 ${fmt(pe,1)} 倍對金融股沒有參考價值——那是高槓桿與監理資本結構的結果，不代表便宜。` : '') });
+
+  if(has('EPS_MISSING'))
+    return wrap({ level:'na', key:'na', light:'⚪', label:'資料不足', cls:'text-slate-400 bg-slate-700/30 border-slate-600/40',
+             note:`${LONG_REASON_COPY.EPS_MISSING.detail}${LONG_REASON_COPY.EPS_MISSING.lim}` });
+
+  /* 安全閘：獲利既不穩定也不是單方向，本益比不適用。 */
+  if(has('EPS_ERRATIC'))
+    return wrap({ level:'na', key:'trap', light:'⚠️', label:'獲利大幅波動 · 不判定位階',
              cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:null,
-             /* v93e-2：原文「而那通常是循環的末端」是對市場週期下結論，本頁沒有那個資料。
-                只講程式真的看到的事：分母在大幅變動，所以同一個股價會算出差很多的本益比。 */
-             note:`這檔近四季的獲利變動幅度，超過本頁設定的穩定度門檻。<br>
-                   本益比的分母（每股盈餘）正在大幅變動，<strong>同一個股價會算出差很多的本益比</strong>——
-                   獲利在高點時本益比看起來最低，獲利一掉下來同一個價格就變得很貴。<br>
-                   所以這次<strong>不把本益比當成可靠的長線尺</strong>，請改看營收年增率與獲利本身的變化。` };
-  /* 安全閘二：低本益比 + 獲利連續下滑 = 典型的低本益比陷阱。 */
-  const B = peBands(ind, d);
-  const pctl = (B.basis === 'self') ? histPct(d.perHist, pe) : null;
-  const basisNote = (pctl != null)
-    ? `（過去五年裡大約有 <strong>${pctl}%</strong> 的日子比今天便宜；判定基準：${B.label}）`
+             /* v93h：這一段原本是 LONG_REASON_COPY.EPS_ERRATIC 的第二份手抄。
+                現在只留「所以你可以看什麼」，理由本身交給那一份。 */
+             note:`${LONG_REASON_COPY.EPS_ERRATIC.detail}<br>${LONG_REASON_COPY.EPS_ERRATIC.lim}
+                   請改看營收年增率與獲利本身的變化。` });
+
+  const B = L.bands;
+  const basisNote = (L.pctl != null)
+    ? `（過去五年裡大約有 <strong>${L.pctl}%</strong> 的日子比今天便宜；判定基準：${B.label}）`
     : `（判定基準：${B.label}）`;
-  if(pe < B.cheap && epsDeclining(d))
-    return { level:'na', key:'trap', light:'⚠️', label:'本益比失真 · 不判定', method:'none',
-             cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:B,
-             note:`本益比 ${fmt(pe,1)} 倍雖然低於便宜門檻 ${B.cheap}，但近四季的每股盈餘連續下降。<strong>低本益比可能只是過去比較高的獲利仍然留在分母裡</strong>，因此這次不把它解讀成便宜。` };
-  if(pe < B.cheap)
-    return { level:'buy', key:'cheap', light:'🟢', label:'便宜區', method:'pe', basis:B.basis, cls:'text-emerald-300 bg-emerald-500/10 border-emerald-500/40', bands:B,
-             note:`本益比 ${fmt(pe,1)} 倍低於便宜門檻 ${B.cheap}，長線位階偏「便宜」，可分批建立部位。${basisNote}` };
-  if(pe <= B.fair)
-    return { level:'hold', key:'fair', light:'🟡', label:'合理區（牛熊拉鋸）', method:'pe', basis:B.basis, cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:B,
-             note:`本益比 ${fmt(pe,1)} 倍落在 ${B.cheap}～${B.fair} 的「合理」區間，維持既有紀律，不追高不殺低。${basisNote}` };
-  if(pe <= B.rich)
-    return { level:'hold', key:'warm', light:'🟡', label:'偏貴區（牛熊拉鋸）', method:'pe', basis:B.basis, cls:'text-amber-300 bg-amber-500/10 border-amber-500/40', bands:B,
+  /* 信心不足時的附註：代碼 → LONG_REASON_COPY，不在這裡手寫。 */
+  /* v93h：改呼叫唯一的那一支。連「哪些理由該印」也不再在這裡挑—— 
+     挑選規則一旦有兩份，兩份就會分岔。 */
+  const warnNote = L.confidence === 'normal' && L.pricing === 'available' ? '' : reasonInline(L);
+
+  const AMBER = 'text-amber-300 bg-amber-500/10 border-amber-500/40';
+  /* 顯示層唯一的降階規則：信心不足時不發綠燈。位階仍是 cheap，價位照給。 */
+  if(L.position === 'cheap' && longNoGreen(L))
+    return wrap({ level:'hold', key:'cheap', light:'⚠️', label:'便宜區 · 但這把尺這次不夠可信',
+             cls:AMBER, bands:B,
+             note:`本益比 ${fmt(pe,1)} 倍低於便宜門檻 ${B.cheap}。<strong>但本頁這次不把它當成綠燈</strong>。${basisNote}${warnNote}` });
+  if(L.position === 'cheap')
+    return wrap({ level:'buy', key:'cheap', light:'🟢', label:'便宜區', cls:'text-emerald-300 bg-emerald-500/10 border-emerald-500/40', bands:B,
+             note:`本益比 ${fmt(pe,1)} 倍低於便宜門檻 ${B.cheap}，長線位階偏「便宜」，可分批建立部位。${basisNote}` });
+  if(L.position === 'fair')
+    return wrap({ level:'hold', key:'fair', light:'🟡', label:'合理區（牛熊拉鋸）', cls:AMBER, bands:B,
+             note:`本益比 ${fmt(pe,1)} 倍落在 ${B.cheap}～${B.fair} 的「合理」區間，維持既有紀律，不追高不殺低。${basisNote}${warnNote}` });
+  if(L.position === 'warm')
+    return wrap({ level:'hold', key:'warm', light:'🟡', label:'偏貴區（牛熊拉鋸）', cls:AMBER, bands:B,
              /* v93d：原文「停止加碼並觀察獲利是否跟上」——前半是資金配置指示，
                 這一頁不知道你的狀況，沒有資格下。後半（看獲利跟不跟得上）才是這裡真的知道的事。 */
-             note:`本益比 ${fmt(pe,1)} 倍落在 ${B.fair}～${B.rich}，位階轉偏貴。要判斷這個價格合不合理，看的是獲利有沒有跟上——不是價格本身。${basisNote}` };
-  return { level:'sell', key:'rich', light:'🔴', label:'昂貴區', method:'pe', basis:B.basis, cls:'text-rose-300 bg-rose-500/10 border-rose-500/40', bands:B,
-           note:`本益比 ${fmt(pe,1)} 倍高於昂貴門檻 ${B.rich}，位階「昂貴」。<strong>這一頁不提供任何減碼比例或資金去處的建議。</strong>${basisNote}` };
+             note:`本益比 ${fmt(pe,1)} 倍落在 ${B.fair}～${B.rich}，位階轉偏貴。要判斷這個價格合不合理，看的是獲利有沒有跟上——不是價格本身。${basisNote}${warnNote}` });
+  return wrap({ level:'sell', key:'rich', light:'🔴', label:'昂貴區', cls:'text-rose-300 bg-rose-500/10 border-rose-500/40', bands:B,
+           note:`本益比 ${fmt(pe,1)} 倍高於昂貴門檻 ${B.rich}，位階「昂貴」。<strong>這一頁不提供任何減碼比例或資金去處的建議。</strong>${basisNote}${warnNote}` });
 }
 
 /* 短線位階（布林通道）。v84 之前這段邏輯只活在 tacticalOf 裡面，
@@ -6223,73 +6461,32 @@ function buildTargets(d){
      舊閘門造成的畫面是：位階欄印「🟡 合理區」（valuate 只要官方 PER 就成立），
      而同一檔的三維度目標價卻整區空白。同一份資料、兩套門檻、兩個互相矛盾的答案。
      KY 股與金控子公司抓不到 EPS 是常態，所以這不是邊角情況。 */
-  const _pbc0 = perBaseClose(d);
-  /* v93e-2：金融股的位階是用**股價淨值比（PBR）**判定的（見 valuate()），
-     但這裡以前無條件用 PE bands × EPS 生出長線便宜／合理／昂貴價。
-     結果同一檔股票會出現「位階看 PBR、目標價看 PE」——兩種估值方法混在一起。
-     而 tacticFor() 的註解還以為金融股都被前面的 V 卡攔掉了；實際上只有
-     「**沒有** PBR 歷史」的金融股會拿到 fin 這個 key，有 PBR 歷史的會一路走下去。
-
-     在沒有可靠的「每股淨值 → 價格」換算之前，正確的做法是不輸出：
-     寧可少一組數字，也不要把 PE 算出來的價位掛在一檔用 PBR 判位階的股票上。 */
-  /* 條件是「是不是金融業」，**不是**「有沒有 PBR 歷史」。
-     第一版我寫成後者，結果「金融股但還沒抓到 PBR 歷史」那一種照樣拿到
-     PE 算出來的便宜／合理／昂貴價——那正是最不該給的情況：
-     連判位階的尺都還沒有，卻先給了三個具體價位。 */
-  const _fin = isFinancial(d.ind, d.id);
-  if(_fin){
-    const _hasPBR = !!histBands(d.pbrHist);
-    t.longOk = false;
-    t.longBlocked = _hasPBR ? 'finPBR' : 'finNoPBR';
-    t.longBlockWhy = _hasPBR
-      ? '這是金融業，本頁的長線位階是用<strong>股價淨值比（PBR）</strong>判定的，'
-        + '而下面這三個價位的算法是「本益比 × 每股盈餘」——<strong>兩種尺不能混用</strong>。'
-        + '在本頁做出可靠的「每股淨值 → 價格」換算之前，不輸出金融股的長線目標價。'
-      : '這是金融業，要用<strong>股價淨值比（PBR）</strong>判定，但目前還沒有足夠的 PBR 歷史。'
-        + '本益比對金融股沒有參考價值——那是高槓桿與監理資本結構的結果，不代表便宜。'
-        + `請按「${LBL_REFRESH_W}」取得官方資料。`;
-    t.longBlockWhy += '<br>中期（季線）與短期（布林通道）是純價格指標，不受影響，照常顯示。';
-  } else if((d.eps && d.eps > 0) || (d.per > 0 && _pbc0 > 0)){
+  /* v93h：這一段以前自己算 PE 區間、自己算換算價、自己判「脫鉤」、自己決定金融股要不要出價。
+     那讓長線價格有了兩個權威（見 longValuation 裡那段註解）。
+     現在整段只做一件事：**問 longValuation()，然後抄下來**。
+     底下這些舊名字（longOk／longBroken／longWhy／longBlocked）保留，
+     但它們不再是各自算出來的判斷，而是同一個答案的別名——
+     這樣還沒 migrate 的 UI 不會斷，而「誰說了算」只剩一個。 */
+  const L = longValuation(d);
+  t.long = L;
+  t.bands = L.bands || undefined;
+  if(L.prices){
     t.longOk = true;
-    const B = peBands(d.ind, d);
-    t.bands = B;
-    /* 倍數來自官方 PER 的分位，分母就必須是官方 PER 隱含的 EPS，
-       不能拿自算的 TTM EPS 去乘——那是單位錯配，同一頁會算出差 16% 的兩組目標價。 */
-    const pbc = perBaseClose(d);
-    const epsBase = (d.per > 0 && pbc > 0) ? (pbc / d.per) : d.eps;
-    t.epsBase = epsBase;
-    t.epsBaseSrc = (d.per > 0 && pbc > 0) ? 'official' : 'calc';
-    t.epsBaseAsOf = (d.per > 0 && pbc > 0) ? (d.perAsOf || d.asOf || null) : null;
-    t.cheap = +(epsBase*B.cheap).toFixed(1);
-    t.fair  = +(epsBase*B.fair).toFixed(1);
-    t.rich  = +(epsBase*B.rich).toFixed(1);
-    /* ══ v72：分位模型失效的判定 ══════════════════════════════
-       實測 2327 國巨（2026-08-18）：近四季 EPS 14.88、現價 608，本益比 40.9 倍；
-       但它自己近 4.8 年的本益比區間是 5.7~89.8 倍，第 20／50／80 百分位是 9.5／12.6／17.1。
-       於是畫面印出「便宜 141.1、合理 187.1、昂貴 254.0」——
-       **現價是「昂貴價」的 2.4 倍**，而同一頁的季線是 780.7（本益比 52 倍）。
-       三個價位擺在一起互相矛盾，對不看線圖的人來說那看起來像「這檔貴了三倍該賣」。
-
-       它們在數學上沒有錯（「本益比回到過去水準時的價格」），但那不是目標價，
-       而且沒有任何一句話講清楚這個差別。（這是程式註解：實際畫面上不替原因下結論——
-       程式只知道尺與價格脫鉤，不知道是成長、循環還是別的。）
-
-       判定條件只用一條，而且是可以直接量的那一條：
-         **現價離換算出來的區間太遠**（高於昂貴價 1.5 倍，或低於便宜價 0.67 倍）。
-       國巨實測：昂貴價 254、現價 608 → 608 > 254×1.5=381 ✔ 觸發。
-
-       刻意**不**把 perTrending 也拿來當停止條件：本益比長年緩步上修的績優股
-       （例如台積電）會被它判定為趨勢，但那種股票的換算價位仍然貼著股價、仍然有參考價值。
-       趨勢本來就已經有一行警語，再讓它整個停掉是矯枉過正。
-       這裡要擋的是「數字明顯荒謬」，不是「數字不完美」。 */
-    const far = (d.price > 0) &&
-                ((t.rich  > 0 && d.price > t.rich  * 1.5) ||
-                 (t.cheap > 0 && d.price < t.cheap * 0.67));
-    if(far){
-      t.longBroken = true;
-      t.longWhy = B.trending ? 'trend' : 'far';
-      t.peNow = (d.price > 0 && epsBase > 0) ? +(d.price / epsBase).toFixed(1) : null;
-    }
+    t.cheap = L.prices.cheap; t.fair = L.prices.fair; t.rich = L.prices.rich;
+    t.epsBase = L.prices.epsBase; t.epsBaseSrc = L.prices.epsBaseSrc; t.epsBaseAsOf = L.prices.epsBaseAsOf;
+  }
+  if(L.reasons.includes('PRICE_MODEL_DIVERGED')){
+    t.longBroken = true;
+    t.longWhy = L.bands && L.bands.trending ? 'trend' : 'far';
+    t.peNow = L.prices ? L.prices.peNow : null;
+  }
+  /* 金融股：位階可能判得出來（PBR），但價位一定不出。理由碼決定文案，文案不再手寫。 */
+  if(L.reasons.includes('FINANCIAL_PBR') || L.reasons.includes('FINANCIAL_NO_PBR')){
+    const _hasPBR = L.reasons.includes('FINANCIAL_PBR');
+    t.longBlocked = _hasPBR ? 'finPBR' : 'finNoPBR';
+    t.longBlockWhy = LONG_REASON_COPY[_hasPBR ? 'FINANCIAL_PBR' : 'FINANCIAL_NO_PBR'].detail
+      + ' ' + LONG_REASON_COPY[_hasPBR ? 'FINANCIAL_PBR' : 'FINANCIAL_NO_PBR'].lim
+      + '<br>中期（季線）與短期（布林通道）是純價格指標，不受影響，照常顯示。';
   }
   if(d.ma60){ t.midBuy = d.ma60; t.midWarn = +(d.ma60*0.95).toFixed(1); }
   if(d.bollLow!=null){ t.shortBuy = d.bollLow; t.shortSell = d.bollUp; }
@@ -6433,7 +6630,17 @@ function tacticFor(s){
   /* v93e-2：原本只擋 'fin'（金融業但**沒有** PBR 歷史）。有 PBR 歷史的金融股
      位階是用 PBR 判的，卻會一路走到下面用 PE 產生的價位去下策略結論。
      金融股一律不讓 PE 參與第三層。 */
-  if(V.key === 'trap' || V.key === 'fin' || isFinancial(d.ind, s.id)){
+  /* v93h：這三個條件（trap／fin／isFinancial）以前是第三層自己再判一次「能不能下結論」，
+     而第一層早就用另一套規則判過同一件事——兩份判斷、兩套條件。
+     現在改問唯一的權威：longValuation() 的能力欄位。
+       · capabilities.position === false → 連位階都判不出來（trap／fin／資料不足）
+       · pricing === 'blocked'           → 位階可能判得出來，但價位不可用
+                                           （金融股 PBR、換算價已脫鉤）
+     用一個已知不可用的價位去算加碼／減碼區間，看起來很具體，卻沒有參考價值。
+     順帶接住舊版漏掉的一種：換算價已脫鉤（國巨式）——
+     它以前 longOk 是 true，第三層照樣拿那組價位下結論。 */
+  const LV = V.long || longValuation(d);
+  if(!LV.capabilities.position || LV.pricing === 'blocked'){
     return { key:'V', tone:'amber', icon:V.light, title:`${V.label} — 不輸出調倉動作`,
       body:`${V.note}<br><br>系統<strong>不會</strong>在這個狀態下給你加碼或減碼的價位——
             用一個已知失真的估值去算出來的買賣區間，看起來很具體，卻沒有參考價值。
@@ -6553,7 +6760,19 @@ function tacticFor(s){
             這種區間本來就沒有明顯的訊號。與其盯每天的價格，不如看公司的營收與獲利有沒有變化。`,
       moves: buildWatchMoves(p, t) };
   }
-  return { ...r, longSt, midSt, shortSt, aboveYear, whale };
+  /* v93h：可信度不足時，第三層**不靜音、但要降級**。
+     靜音是錯的產品決策——中線與短線是純價格事實，長線可信度低也不該把它們一起殺掉；
+     而且使用者定的契約是「不確定 ≠ 數字全部消失」。
+     所以卡片照出，只是在同一張卡上把「這次為什麼比較不可靠」講出來，
+     並留下 machine-readable 的 longConfidence／longReasons 給上層決定要不要再降。
+     文案一樣不在這裡寫——reasonInline() 是全站唯一那一支。 */
+  if(LV.confidence !== 'normal' && r && r.body)
+    r = { ...r, body: r.body +
+      `<div class="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-[13px] leading-relaxed text-amber-100">
+         <strong>⚠ 這張卡片的長線部分，這次可信度有限</strong>${reasonInline(LV)}
+         <br>中線（季線）與短線（布林通道）是純價格指標，不受影響。</div>` };
+  return { ...r, longSt, midSt, shortSt, aboveYear, whale,
+           longConfidence: LV.confidence, longReasons: LV.reasons.slice() };
 }
 
 function buildWatchMoves(p, t){
@@ -6594,7 +6813,10 @@ function buildWatchMoves(p, t){
    跟卡片區同一套規則，不能一邊說「不列價位」一邊在這裡列出來。 */
 function priceLadder(d){
   const t = d.targets || {}, p = d.price;
-  const longOk = t.longOk && !t.longBroken;
+  /* v93h：這裡以前是「t.longOk && !t.longBroken」——兩個 flag 合起來自己做一次判斷。
+     現在直接問唯一的權威。舊寫法保留在後面當 fallback，
+     只為了讓「舊快取還原出來、沒有 long 物件」的資料不會整塊消失。 */
+  const longOk = t.long ? t.long.capabilities.longPrices : (t.longOk && !t.longBroken);
   const pts = [
     /* v85：這裡的顏色是行內 style，Tailwind 的色階覆蓋管不到。
        實測 #ef4444 在這個底色上只有 4.94:1，#f472b6 是 7.02——
@@ -6899,6 +7121,7 @@ function targetPanelHTML(s){
         <div class="font-bold text-[15px] mb-1.5">🏦 這一檔不列長線目標價</div>
         ${t.longBlockWhy}
       </div>
+      ${reasonPanel(t.long)}
       ` : t.longBroken ? `
       <!-- v72：分位模型對這一檔已經脫鉤，不列價位。理由寫在 buildTargets 的註解裡。 -->
       <div class="rounded-xl border-2 border-amber-500/60 bg-amber-500/10 text-amber-100 p-3 text-[14px] leading-relaxed">
@@ -6922,6 +7145,8 @@ function targetPanelHTML(s){
         <strong>這個模型對這一檔目前失效，所以不列出價位。</strong>下面的季線與布林通道是純技術指標，不含估值判斷。
       </div>
       <div class="text-[10px] text-slate-500 mt-1">倍數基準：${esc(bnd.label)}</div>
+      <!-- v93h 第四層：這次的可信度、為什麼、以及它不知道什麼。內容全部來自 reasons。 -->
+      ${reasonPanel(t.long)}
       ` : `
       ${bcp.warn ? `<div class="rounded-lg border-2 border-amber-500/60 bg-amber-500/10 text-amber-100 p-2.5 mb-2 text-[13px] leading-relaxed">
         <div class="font-bold mb-0.5">⚠ 下面三個價格不是用這家公司自己的歷史算的</div>${bcp.warn}</div>` : ''}
@@ -6971,6 +7196,8 @@ function targetPanelHTML(s){
           </div>`;
       })()}
       <div class="text-[10px] text-slate-500 mt-1">倍數基準：${esc(bnd.label)}</div>
+      <!-- v93h 第四層：這次的可信度、為什麼、以及它不知道什麼。內容全部來自 reasons。 -->
+      ${reasonPanel(t.long)}
       `}
 
       <!-- v65：自由現金流殖利率。本益比看的是「帳上賺多少」，這一條看的是「真的收到多少現金」。
@@ -8711,19 +8938,53 @@ const GUIDE = [
     '<strong class="text-amber-300">「意義」那一欄不會出現「應停止加碼」「該分批獲利了結」這一類的祈使句</strong>——' +
     '那是對資金配置的指示，而這一頁不知道你的年齡、現金需求、其他資產或健康狀況。<br>' +
     '留下來的是價位本身與它代表的位置：那是機械推導的結果，看它，但要不要動、動多少，是你的判斷。') +
-  H2('🏛️ 長期目標價 — 這家公司值多少錢？') +
-  P('資料來源：綜合損益表<strong>最近 4 季累積 EPS</strong>。公式是最經典的本益比估值法。') +
-  TABLE(['目標價','公式','意義'],[
-   /* v89：這兩列原本寫死「EPS × 12 倍」「EPS × 16 倍」，而同一張表第三列自己就寫著
-      「倍數依這檔自己的歷史決定，不是固定值」；另一分頁更直接寫「第一版寫死的 12／16／20
-      沒有任何來源，是憑印象訂的，現在改成……」。也就是說這份說明一邊宣告 12／16 已被廢除，
-      一邊在這裡把它當成現行公式教給使用者。實測畫面上印的是 5.5 / 13.4 / 20.5 倍。 */
-   ['🟢 本益比低檔換算價','EPS × <strong>第 20 百分位</strong>的本益比','長線價值浮現區。倍數依這檔自己過去五年的本益比決定，每一檔都不一樣。'],
-   ['🟡 合理參考價（價值中樞 📊）','EPS × <strong>第 50 百分位</strong>的本益比','估值中樞。同樣依這檔自己的歷史決定，不是固定值。'],
-   ['🔴 本益比高檔換算價','EPS × <strong>第 80 百分位</strong>的本益比','過熱區。與燈號、策略卡的昂貴門檻是同一個數字——股價超過它時，燈號同步轉紅。倍數依這檔自己的歷史決定，不是固定值。']
+  H2('🏛️ 長期估值 — 這家公司值多少錢？') +
+  /* v93g：這一段原本教的是「資料來源：最近 4 季 EPS，本益比估值法」，
+     而且三列都寫「倍數依這檔自己過去五年的本益比決定」。
+     但 production 早就有五種組合（PBR／PE-self／PE-ind／PE-conv／不判定），
+     所以這個說明頁至少對三種情況說錯——它在教使用者一條這一頁並不保證成立的規則。
+     這跟 🐖 那一輪的病灶同源：**說明頁也有能力自己手寫估值方法**。
+     修法一樣：說明頁改成介紹「模型怎麼選尺」，而具體文案從 PE_BASIS_COPY 與
+     LONG_REASON_COPY 生成——那兩張表就是判定層在用的同一份。 */
+  P('這一頁的長線估值不是一條固定公式，而是一個<strong>依資料完整度自動退階的模型</strong>。' +
+    '所以下面講的是「本頁會怎麼選尺」，不是「你手上這一檔一定用哪一把」。<br>' +
+    '<strong class="text-sky-300">實際這一檔用了哪一把尺、跟什麼比，請以個股畫面上的「計算依據」' +
+    '以及點 🐖 動物標籤後看到的「這一次用的尺」為準。</strong>') +
+  TABLE(['用哪一把尺','什麼情況會用','量的是什麼'],[
+   ['<strong>本益比（PE）</strong>','一般公司','股價 ÷ 最近 4 季累積每股盈餘'],
+   ['<strong>股價淨值比（PBR）</strong>','金融、保險、銀行、證券、租賃',
+    '股價 ÷ 每股淨值，比的是這一檔自己的 PBR 歷史。這些行業的獲利是高槓桿與監理資本結構的結果，本益比對它們沒有參考價值。' +
+    '<br><strong class="text-amber-300">本頁沒有可靠的「每股淨值 → 價格」換算，所以金融股不輸出下面那三個長線價位</strong>，只判位階。'],
+   ['<strong>不判定</strong>','每股盈餘為負或缺漏、金融股還沒抓到 PBR 歷史、獲利忽高忽低',
+    '這種時候本頁不給位階。寧可少一塊，也不要用一把不成立的尺給出看起來像答案的東西。']
   ]) +
-  NOTE('amber','⚠️ 本益比估值法的兩個盲點（很重要）',
-   '<strong>①這一版已大幅改善</strong>：門檻改用「這檔自己的歷史分位」之後，高成長股不再因為固定 20 倍上限而長期顯示昂貴——台積電跟台積電比，中華電跟中華電比。<br><strong>②景氣循環股在獲利高峰反而顯示「便宜」</strong>：航運、面板、記憶體在景氣頂點 EPS 暴衝，本益比看起來只有 5 倍，但那正是最危險的位置（低本益比陷阱）。<br>使用時請自己分類：成熟穩定股適用，成長股與循環股要另外判斷。') +
+  P('用本益比時，<strong>拿來比的基準</strong>再依資料完整度往下退（前一種不成立才會用到後一種）：') +
+  TABLE(['順序','比較基準','門檻怎麼來的'],[
+   ['①','這一檔<strong>自己的歷史</strong>（最可靠）', PE_BASIS_COPY.self.foot],
+   ['②','<strong>同業中位數</strong>', PE_BASIS_COPY.ind.foot],
+   ['③','<strong>產業慣例</strong>（最弱）', PE_BASIS_COPY.conv.foot]
+  ]) +
+  P('選定基準之後，三個長線價位就是<strong>每股盈餘 × 該基準的三個門檻</strong>：') +
+  TABLE(['目標價','公式','意義'],[
+   ['🟢 便宜參考價','EPS × <strong>第 20 百分位</strong>的本益比','長線價值浮現區。倍數由上面那張表選到的基準決定，每一檔都不一樣，也不是固定的 12／16／20 倍。'],
+   ['🟡 合理參考價（價值中樞 📊）','EPS × <strong>第 50 百分位</strong>的本益比','估值中樞。同樣由基準決定，不是固定值。'],
+   ['🔴 偏貴參考價','EPS × <strong>第 80 百分位</strong>的本益比','過熱區。與燈號、策略卡的昂貴門檻是同一個數字——股價超過它時，燈號同步轉紅。']
+  ]) +
+  P('最後，同一把尺這一次<strong>可不可信</strong>，由近四季獲利的「形狀」決定。' +
+    '<strong>可信度低不等於數字消失</strong>：價位照給，但燈號會降階，並且說出降階的理由。') +
+  TABLE(['近四季獲利的形狀','本頁的處理','為什麼'],[
+   ['穩定','正常判定','分母穩，本益比才有意義。'],
+   ['連四季走高', '價位照給、<strong>不給綠燈</strong>', LONG_REASON_COPY.EPS_MONOTONIC_UP.detail + '<br>' + LONG_REASON_COPY.EPS_MONOTONIC_UP.lim],
+   ['連四季縮小', '價位照給、<strong>不給綠燈</strong>，並標明方向', LONG_REASON_COPY.EPS_MONOTONIC_DOWN.detail + '<br>' + LONG_REASON_COPY.EPS_MONOTONIC_DOWN.lim],
+   ['忽高忽低',   '<strong>不判位階、不出價位</strong>', LONG_REASON_COPY.EPS_ERRATIC.detail],
+   ['本益比五年是一條趨勢', '價位照給、<strong>不給綠燈</strong>', LONG_REASON_COPY.PE_HISTORY_TRENDING.detail]
+  ]) +
+  NOTE('amber','⚠️ 這個模型知道自己不知道什麼',
+   '<strong>①門檻改用「這檔自己的歷史分位」之後</strong>，高成長股不再因為固定 20 倍上限而長期顯示昂貴——台積電跟台積電比，中華電跟中華電比。<br>' +
+   '<strong>②本頁分不出「公司在成長」與「景氣循環走到頂」</strong>：實測長榮式的循環頂點（近四季 EPS 12→22→35→45）與單純的成長股（1→2→3→4），' +
+   '變異係數（0.44 vs 0.45）與高低差（3.75 vs 4.00）幾乎相同。既然分不出來，本頁的做法就是<strong>兩種都不給綠燈</strong>，' +
+   '而不是假裝認得出哪一種。航運、面板、記憶體在景氣頂點 EPS 暴衝、本益比只剩 5 倍，那正是最危險的位置（低本益比陷阱）。<br>' +
+   '<strong>③第 20／50／80 百分位是本頁自己挑的門檻，未經回測。</strong>') +
   H2('📊 中期目標價 — 波段趨勢還在嗎？') +
   TABLE(['目標價','公式','意義'],[
    ['🟢 季線（60 日均線）','最新 <strong>60MA 季線</strong>','股價回到季線、同時千張大戶連兩週增持。本頁把這叫做一種「形態」，它描述已經發生的事，不代表接下來會漲。'],
