@@ -1,0 +1,88 @@
+# tests.manifest —— 「哪些檔案屬於正式回歸套件」的唯一名單。
+#
+# 為什麼要有這個檔：run-suite.sh 以前把名單寫在自己身上，staleguard.sh 又硬編一份，
+# 於是同一個 enum 有兩份副本——那正是這個專案最常出事的形狀。
+# 現在兩支腳本都讀這裡，新增第 70 支測試只要改這一個檔。
+#
+# 路徑都是相對於 repo 根目錄（index.html 所在的那一層）。
+#
+# 欄位（用 Tab 分隔）：
+#   path      相對於 repo 根目錄
+#   group     core / r13 / contract
+#   enabled   1 = 進套件；0 = 暫時停用（請在旁邊寫原因）
+#   requires  playwright / node —— 目前只做紀錄，runner 尚未依它跳過
+#   expect    這支測試穩定的斷言數。填了就會檢查「跑完但只跑了一半」；空白 = 不檢查。
+#
+# 停用一支測試請改 enabled，不要從名單刪掉——刪掉就看不出它曾經存在。
+#
+# path	group	enabled	requires	expect
+tests/invariants.mjs	core	1	playwright	
+tests/ledger.mjs	core	1	playwright	
+tests/close.mjs	core	1	playwright	
+tests/audit.mjs	core	1	playwright	
+tests/txn_e2e.mjs	core	1	playwright	
+tests/dlg.mjs	core	1	playwright	
+tests/fs.mjs	core	1	playwright	
+tests/reg.mjs	core	1	playwright	
+tests/v49.mjs	core	1	playwright	
+tests/r13/ui.mjs	r13	1	playwright	
+tests/r13/fold.mjs	r13	1	playwright	
+tests/r13/warn.mjs	r13	1	playwright	
+tests/r13/toast.mjs	r13	1	playwright	
+tests/r13/eddie.mjs	r13	1	playwright	
+tests/r13/secfold.mjs	r13	1	playwright	
+tests/r13/t100db.mjs	r13	1	playwright	
+tests/r13/broken.mjs	r13	1	playwright	
+tests/r13/pebase.mjs	r13	1	playwright	
+tests/r13/fcf.mjs	r13	1	playwright	
+tests/r13/fcf2.mjs	r13	1	playwright	
+tests/r13/rt.mjs	r13	1	playwright	
+tests/r13/rtdiag.mjs	r13	1	playwright	
+tests/r13/rtempty.mjs	r13	1	playwright	
+tests/r13/live.mjs	r13	1	playwright	
+tests/r13/target.mjs	r13	1	playwright	
+tests/r13/verify.mjs	r13	1	playwright	
+tests/r13/window.mjs	r13	1	playwright	
+tests/r13/wide.mjs	r13	1	playwright	
+tests/r13/look.mjs	r13	1	playwright	
+tests/r13/look2.mjs	r13	1	playwright	
+tests/r13/fees.mjs	r13	1	playwright	
+tests/r13/toastclose.mjs	r13	1	playwright	
+tests/r13/btnsize.mjs	r13	1	playwright	
+tests/r13/closeall.mjs	r13	1	playwright	
+tests/r13/penote.mjs	r13	1	playwright	
+tests/r13/rtclock.mjs	r13	1	playwright	
+tests/r13/overlap.mjs	r13	1	playwright	
+tests/r13/costlines.mjs	r13	1	playwright	
+tests/r13/autoconn.mjs	r13	1	playwright	
+tests/r13/legend_short.mjs	r13	1	playwright	
+tests/r13/par.mjs	r13	1	playwright	
+tests/r13/reachtarget.mjs	r13	1	playwright	
+tests/r13/zoom.mjs	r13	1	playwright	
+tests/r13/priv.mjs	r13	1	playwright	
+tests/r13/stalegate.mjs	r13	1	playwright	
+tests/r13/ttmeps.mjs	r13	1	playwright	
+tests/r13/lookup.mjs	r13	1	playwright	
+tests/r13/bootmarket.mjs	r13	1	playwright	
+tests/r13/mktstale.mjs	r13	1	playwright	
+tests/r13/misc85.mjs	r13	1	playwright	
+tests/r13/bigfs.mjs	r13	1	playwright	
+tests/r13/exitpx.mjs	r13	1	playwright	
+tests/r13/contrast.mjs	r13	1	playwright	
+tests/r13/longmiss.mjs	r13	1	playwright	
+tests/r13/onenum.mjs	r13	1	playwright	
+tests/r13/unkbuy.mjs	r13	1	playwright	
+tests/r13/reduce87.mjs	r13	1	playwright	
+tests/r13/adj87.mjs	r13	1	playwright	
+tests/r13/bounds87.mjs	r13	1	playwright	
+tests/r13/cachehonest.mjs	r13	1	playwright	
+tests/r13/resil87.mjs	r13	1	playwright	
+tests/r13/statgrid.mjs	r13	1	playwright	
+tests/r13/blockc.mjs	r13	1	playwright	
+tests/r13/sec88.mjs	r13	1	playwright	
+tests/r13/privsweep.mjs	r13	1	playwright	
+tests/r13/walk.mjs	r13	1	playwright	
+tests/r13/walkdeep.mjs	r13	1	playwright	
+tests/scratch/lv.mjs	contract	1	playwright	76
+tests/scratch/prov.mjs	contract	1	playwright	51
+tests/scratch/paneltitle.mjs	contract	1	playwright	7

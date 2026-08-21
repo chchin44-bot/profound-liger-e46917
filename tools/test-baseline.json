@@ -1,0 +1,355 @@
+{
+ "note": "每一支的已知狀態。expect 不是 PASS 的，必須寫 category 與 why——這份檔案的目的是讓「變化」看得見，不是替紅燈辦永久居留證。最終目標仍然是 expected fail = 0。",
+ "tests": {
+  "tests/audit.mjs": {
+   "expect": "FAIL",
+   "category": "未診斷",
+   "why": "exit code 非 0，但輸出裡數不到任何 FAIL 行——它用自己的方式判定失敗。尚未逐條確認。"
+  },
+  "tests/close.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/dlg.mjs": {
+   "expect": "FAIL",
+   "category": "假綠被抓出來",
+   "why": "21 條斷言在失敗（對話框兩欄對齊、說明預設收合），但這支沒有呼叫 process.exit，所以舊 runner 一直把它算成綠的。v93i 改成數 FAIL 行才發現。純版面問題，與估值無關。"
+  },
+  "tests/fs.mjs": {
+   "expect": "EMPTY",
+   "category": "數不到斷言",
+   "why": "這支把 PASS 印在行尾（「字級存檔往返: {...} PASS」），runner 的計數只認行首。測試本身有在跑，但 runner 看不見斷言數，所以不算綠。"
+  },
+  "tests/invariants.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/ledger.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/adj87.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/autoconn.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/bigfs.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/blockc.mjs": {
+   "expect": "FAIL",
+   "category": "數不到斷言／失敗",
+   "why": "同 secfold。"
+  },
+  "tests/r13/bootmarket.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/bounds87.mjs": {
+   "expect": "FAIL",
+   "category": "數不到斷言／失敗",
+   "why": "同 secfold。"
+  },
+  "tests/r13/broken.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/btnsize.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/cachehonest.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/closeall.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/contrast.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/costlines.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/eddie.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/exitpx.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/fcf.mjs": {
+   "expect": "FAIL",
+   "category": "產品行為已改",
+   "why": "自由現金流的每股數字需要面額，而目前「拿不到官方 PBR 就不推算面額」，畫面改成不顯示。測試仍在等舊的數字。要先決定哪一種才對。"
+  },
+  "tests/r13/fcf2.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/fees.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/fold.mjs": {
+   "expect": "FAIL",
+   "category": "產品規格已改",
+   "why": "驗舊版卡片收合行為（收起時只留兩顆按鈕、卡片 ≤340px）。目前是三顆、342px。要先確認現行規格才知道改哪一邊。"
+  },
+  "tests/r13/legend_short.mjs": {
+   "expect": "FAIL",
+   "category": "數不到斷言／失敗",
+   "why": "同 secfold。"
+  },
+  "tests/r13/live.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/longmiss.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/look.mjs": {
+   "expect": "EMPTY",
+   "category": "數不到斷言",
+   "why": "只截圖、不斷言，本來就是探索腳本的性質。"
+  },
+  "tests/r13/look2.mjs": {
+   "expect": "EMPTY",
+   "category": "數不到斷言",
+   "why": "同 look.mjs。"
+  },
+  "tests/r13/lookup.mjs": {
+   "expect": "FAIL",
+   "category": "待查",
+   "why": "目標價視窗裡找不到中期／短期目標價。這一輪 pricing 改動之前就已經是紅的（已比對過前後兩次執行紀錄），但仍需優先確認。"
+  },
+  "tests/r13/misc85.mjs": {
+   "expect": "CRASH",
+   "category": "CRASH",
+   "why": "跑到「減資退款超過成本」那一條之後拋例外中斷。同樣是後段從未被驗過。"
+  },
+  "tests/r13/mktstale.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/onenum.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/overlap.mjs": {
+   "expect": "FAIL",
+   "category": "UI 版面",
+   "why": "頁尾檔數字串與說明句寬度下限，純版面。"
+  },
+  "tests/r13/par.mjs": {
+   "expect": "FAIL",
+   "category": "產品行為已改",
+   "why": "面額推算的 fallback 已被移除（寧可留白也不假設），測試仍在驗舊的 fallback。"
+  },
+  "tests/r13/pebase.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/penote.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/priv.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/privsweep.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/reachtarget.mjs": {
+   "expect": "FAIL",
+   "category": "UI 版面",
+   "why": "手機版自選清單收合時哪些按鈕該藏起來，純版面。"
+  },
+  "tests/r13/reduce87.mjs": {
+   "expect": "FAIL",
+   "category": "產品行為已改",
+   "why": "減資說明文案已改寫，測試比對舊字串。"
+  },
+  "tests/r13/resil87.mjs": {
+   "expect": "FAIL",
+   "category": "數不到斷言／失敗",
+   "why": "同 secfold。"
+  },
+  "tests/r13/rt.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/rtclock.mjs": {
+   "expect": "FAIL",
+   "category": "時間假設過期",
+   "why": "即時報價徽章在「成交時間不是今天」時會改印警告，而測試假設的是盤中即時情境。像是 fixture 的時間假設過期。"
+  },
+  "tests/r13/rtdiag.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/rtempty.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/sec88.mjs": {
+   "expect": "FAIL",
+   "category": "待查",
+   "why": "「本機快照仍保留那句規則」這一條失敗；安全相關，必須確認不是真的把規則洗掉了。"
+  },
+  "tests/r13/secfold.mjs": {
+   "expect": "FAIL",
+   "category": "數不到斷言／失敗",
+   "why": "exit 非 0 但沒有可辨識的斷言輸出，需要進去看。"
+  },
+  "tests/r13/stalegate.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/statgrid.mjs": {
+   "expect": "FAIL",
+   "category": "數不到斷言／失敗",
+   "why": "同 secfold。"
+  },
+  "tests/r13/t100db.mjs": {
+   "expect": "CRASH",
+   "category": "CRASH",
+   "why": "執行期例外，整支沒跑完。代表它後面的區段從來沒被驗過——比單純紅燈更需要優先處理。"
+  },
+  "tests/r13/target.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/toast.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/toastclose.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/ttmeps.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/ui.mjs": {
+   "expect": "FAIL",
+   "category": "UI 已改名",
+   "why": "驗頁首字級按鈕的舊名稱；v93 已依使用者要求改成「標準／舒適／大字」。該改測試，不是產品壞了。"
+  },
+  "tests/r13/unkbuy.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/verify.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/walk.mjs": {
+   "expect": "EMPTY",
+   "category": "數不到斷言",
+   "why": "走訪型腳本，只印觀察結果，沒有斷言。"
+  },
+  "tests/r13/walkdeep.mjs": {
+   "expect": "EMPTY",
+   "category": "數不到斷言",
+   "why": "同 walk.mjs。"
+  },
+  "tests/r13/warn.mjs": {
+   "expect": "FAIL",
+   "category": "產品規格已改",
+   "why": "驗收合狀態下某幾句免責文字是否可見；那幾句在後續版本被改寫或搬位置。"
+  },
+  "tests/r13/wide.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/window.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/r13/zoom.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/reg.mjs": {
+   "expect": "EMPTY",
+   "category": "數不到斷言",
+   "why": "同上：輸出格式不是行首 ok/PASS。"
+  },
+  "tests/scratch/lv.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/scratch/paneltitle.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/scratch/prov.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/txn_e2e.mjs": {
+   "expect": "PASS",
+   "category": "",
+   "why": ""
+  },
+  "tests/v49.mjs": {
+   "expect": "FAIL",
+   "category": "產品行為已改",
+   "why": "兩條失敗：①「百大篩選 filteredList 已刪除」——那個函式又回來了 ②「仍顯示過去實際配的現金」——配息顯示改寫過。其餘 20 幾條（含景氣循環股不給綠燈）都綠。"
+  }
+ }
+}
